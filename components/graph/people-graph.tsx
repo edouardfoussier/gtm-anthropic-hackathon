@@ -567,17 +567,20 @@ export function PeopleGraph({
       // Camera dolly: fit height and width separately (wide screens can keep
       // the camera much closer, so clusters render bigger).
       const halfTan = Math.tan((camera.fov * Math.PI) / 360);
+      // Margins include room for the DOM labels hanging off each cluster —
+      // clusters must never touch the canvas edge (the queue sidebar shrinks
+      // the container at runtime).
       let maxY = 0.8;
       let maxH = 1.2;
       for (const v of visuals.values()) {
-        maxY = Math.max(maxY, Math.abs(v.anchor.y) + v.tier.radius + 0.55);
+        maxY = Math.max(maxY, Math.abs(v.anchor.y) + v.tier.radius + 0.8);
         maxH = Math.max(
           maxH,
-          Math.hypot(v.anchor.x, v.anchor.z) + v.tier.radius + 0.4,
+          Math.hypot(v.anchor.x, v.anchor.z) + v.tier.radius + 1.0,
         );
       }
       const needZ =
-        Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.12 + 1.0;
+        Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.15 + 1.0;
       const cameraTarget =
         visuals.size > 0
           ? Math.min(Math.max(needZ, CAMERA_IDLE_Z), CAMERA_MAX_Z)

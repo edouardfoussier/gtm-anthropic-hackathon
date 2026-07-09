@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ContactDrawer } from "@/components/prospect/contact-drawer";
 import { QueueSidebar } from "@/components/queue/queue-sidebar";
 import { QueueProvider } from "@/components/queue/queue-context";
-import { buildMockProspect, type RealProspect } from "@/lib/mock-prospect";
-import { buildProspectFrames } from "@/lib/prospect-frames";
+import type { RealProspect } from "@/lib/mock-prospect";
+import { buildDemoRun } from "@/lib/demo-run";
 import type { Prospect } from "@/lib/types";
 
 export default function Home() {
@@ -62,9 +62,9 @@ export default function Home() {
     event.preventDefault();
     const name = companyInput.trim();
     if (!name) return;
-    const next = buildMockProspect(name, realProspects);
-    setProspect(next);
-    setFrames(buildProspectFrames(next));
+    const run = buildDemoRun(name, realProspects);
+    setProspect(run.prospect);
+    setFrames(run.frames);
     setCursor(0);
     setAutoPlaying(true);
     setActiveContactId(null);
