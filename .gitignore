@@ -45,6 +45,8 @@ next-env.d.ts
 /data/prospects/*
 /data/slides/*
 /public/videos/*
+/data/jury-*
+/data/seen.json
 !/data/prospects/.gitkeep
 !/data/slides/.gitkeep
 !/public/videos/.gitkeep

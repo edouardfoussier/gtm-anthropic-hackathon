@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { ProspectStats } from "@/lib/analytics";
 
@@ -96,8 +97,20 @@ export function Dashboard() {
                     {s.watchingNow && (
                       <span className="inline-block size-2 animate-pulse rounded-full bg-accent" />
                     )}
-                    <span className="font-medium">{s.firstName}</span>
+                    <Link
+                      href={`/v/${s.id}`}
+                      className="font-medium underline-offset-4 hover:text-accent-orange hover:underline"
+                    >
+                      {s.firstName}
+                    </Link>
                     <span className="text-muted-foreground">· {s.company}</span>
+                    <Link
+                      href={`/v/${s.id}`}
+                      aria-label={`Open ${s.firstName}'s video page`}
+                      className="text-muted-foreground transition-colors hover:text-accent-orange"
+                    >
+                      ↗
+                    </Link>
                   </div>
                 </td>
                 <td className="px-4 py-3">{s.sent ? "✓" : "—"}</td>

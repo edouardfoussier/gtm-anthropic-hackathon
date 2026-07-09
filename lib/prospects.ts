@@ -17,6 +17,8 @@ export interface Prospect {
   lastName: string;
   company: string;
   title: string;
+  /** From FullEnrich when available; empty string means "let the prospect fill it". */
+  phone: string;
   videoUrl: string;
   posterUrl: string;
   sender: Sender;
@@ -37,6 +39,8 @@ interface JuryRecord {
   lastName: string;
   company: string;
   title?: string;
+  phone?: string;
+  linkedin?: string;
 }
 
 export interface ProspectSummary {
@@ -71,14 +75,18 @@ export async function getProspect(id: string): Promise<Prospect | null> {
   const records = JSON.parse(raw) as JuryRecord[];
   const rec = records.find((r) => r.id === id);
   if (!rec) return null;
+  // When a remote engine renders + hosts the videos, load them from it; otherwise
+  // they're served from the app's own public/videos.
+  const engineBase = process.env.ENGINE_API_URL?.trim().replace(/\/+$/, "") ?? "";
   return {
     id: rec.id,
     firstName: rec.firstName,
     lastName: rec.lastName,
     company: rec.company,
     title: rec.title ?? "",
-    videoUrl: `/videos/${rec.id}.mp4`,
-    posterUrl: `/videos/${rec.id}.jpg`,
+    phone: rec.phone ?? "",
+    videoUrl: `${engineBase}/videos/${rec.id}.mp4`,
+    posterUrl: `${engineBase}/videos/${rec.id}.jpg`,
     sender: SENDER,
   };
 }
