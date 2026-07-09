@@ -138,7 +138,7 @@ function HomeInner() {
                   <h1 className="max-w-3xl text-5xl leading-[0.95] md:text-7xl">
                     Type a company.
                     <br />
-                    Watch the pipeline build itself.
+                    We&apos;ll pitch the right person.
                   </h1>
                 </div>
 
