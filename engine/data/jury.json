@@ -1,0 +1,19 @@
+[
+  { "id": "benjamin-douablin", "firstName": "Benjamin", "lastName": "Douablin", "company": "FullEnrich", "title": "CEO", "linkedin": "https://www.linkedin.com/in/benjamin-douablin/" },
+  { "id": "elise-rostaing", "firstName": "Elise", "lastName": "Rostaing", "company": "Fabriq", "title": "Global VP of Marketing", "linkedin": "https://www.linkedin.com/in/eliserostaing/" },
+  { "id": "carole-offredo", "firstName": "Carole", "lastName": "Offredo", "company": "Dataiku", "title": "Former Chief Marketing Officer", "linkedin": "https://www.linkedin.com/in/carole-offredo-99444/" },
+  { "id": "constance-grisoni", "firstName": "Constance", "lastName": "Grisoni", "company": "Gradium", "title": "Chief Growth Officer", "linkedin": "https://www.linkedin.com/in/constance-d-g/" },
+  { "id": "virginie-dupin", "firstName": "Virginie", "lastName": "Dupin", "company": "Foundever", "title": "Chief Marketing Officer", "linkedin": "https://www.linkedin.com/in/virginiedupin/" },
+  { "id": "deeni-fatiha", "firstName": "Deeni", "lastName": "Fatiha", "company": "Gamma", "title": "Head of Product, AI", "linkedin": "https://www.linkedin.com/in/deenifatiha/" },
+  { "id": "margaux-benoit", "firstName": "Margaux", "lastName": "Benoit", "company": "Nabla", "title": "GTM Director", "linkedin": "https://www.linkedin.com/in/margaux-benoit-/" },
+  { "id": "vincent-gonnot", "firstName": "Vincent", "lastName": "Gonnot", "company": "Airtable", "title": "RVP EMEA", "linkedin": "https://www.linkedin.com/in/vincentgonnot/" },
+  { "id": "stephan-von-perger", "firstName": "Stephan", "lastName": "von Perger", "company": "", "title": "Head of EMEA Startup Partnerships", "linkedin": "https://www.linkedin.com/in/stephanvonperger/" },
+  { "id": "ido-kissos", "firstName": "Ido", "lastName": "Kissos", "company": "Deel", "title": "AI", "linkedin": "https://www.linkedin.com/in/ido-kissos/" },
+  { "id": "efrat-ravid", "firstName": "Efrat", "lastName": "Ravid", "company": "Goldman Sachs", "title": "Advisor", "linkedin": "https://www.linkedin.com/in/efratravid/" },
+  { "id": "arnaud-weiss", "firstName": "Arnaud", "lastName": "Weiss", "company": "Sillage", "title": "CEO", "linkedin": "https://www.linkedin.com/in/arnaud-weiss-60b6758a/" },
+  { "id": "elizabeth-coleon", "firstName": "Elizabeth", "lastName": "Coleon", "company": "Photoroom", "title": "VP GTM", "linkedin": "https://www.linkedin.com/in/elizabeth-orzano-coleon/" },
+  { "id": "andrey-lokot", "firstName": "Andrey", "lastName": "Lokot", "company": "DataWave", "title": "Founding GTM", "linkedin": "https://www.linkedin.com/in/alokot/" },
+  { "id": "christa-dabilly", "firstName": "Christa", "lastName": "Dabilly", "company": "Edenred", "title": "Head of Tech Stack for RevOps", "linkedin": "https://www.linkedin.com/in/christadabilly/" },
+  { "id": "camille-allain", "firstName": "Camille", "lastName": "Allain", "company": "", "title": "", "linkedin": "https://www.linkedin.com/in/camille-allain-51b7a2106/" },
+  { "id": "paul-francois-goriaux", "firstName": "Paul-François", "lastName": "Goriaux", "company": "", "title": "", "linkedin": "https://www.malt.fr/profile/paulfrancoisgoriaux1" }
+]
