@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { QueueSidebar } from "@/components/queue/queue-sidebar";
 import { QueueProvider, useQueue } from "@/components/queue/queue-context";
 import type { RealProspect } from "@/lib/mock-prospect";
-import { buildDemoRun } from "@/lib/demo-run";
+import { buildDemoRun, buildRealRun } from "@/lib/demo-run";
+import type { JuryRun } from "@/lib/jury-cache";
 import type { Prospect } from "@/lib/types";
 
 function HomeInner() {
@@ -59,11 +60,19 @@ function HomeInner() {
     undefined,
   );
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = companyInput.trim();
     if (!name) return;
-    const run = buildDemoRun(name, realProspects);
+    // Cached jury company -> REAL Sillage/FullEnrich run; otherwise the scripted demo.
+    let run;
+    try {
+      const res = await fetch(`/api/prospect?company=${encodeURIComponent(name)}`);
+      const data = (await res.json()) as { hit: boolean; run?: JuryRun };
+      run = data.hit && data.run ? buildRealRun(data.run) : buildDemoRun(name, realProspects);
+    } catch {
+      run = buildDemoRun(name, realProspects);
+    }
     setProspect(run.prospect);
     setFrames(run.frames);
     setCursor(0);
