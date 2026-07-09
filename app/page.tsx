@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/layout/page-shell";
 import { PeopleGraph } from "@/components/graph/people-graph";
+import { SignalGlobe } from "@/components/graph/signal-globe";
 import type { PersonNode, PersonStatus } from "@/components/graph/types";
 import { Button } from "@/components/ui/button";
 import { ContactDrawer } from "@/components/prospect/contact-drawer";
@@ -52,6 +53,9 @@ export default function Home() {
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
   const [realProspects, setRealProspects] = useState<RealProspect[]>([]);
+  // The pipeline queue sidebar stays hidden until the visitor has clicked at
+  // least one contact — it shouldn't show up just because a search ran.
+  const [queueSidebarUnlocked, setQueueSidebarUnlocked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +86,7 @@ export default function Home() {
   function handlePersonClick(personId: string) {
     if (personId === COMPANY_ROOT_ID) return;
     setActiveContactId(personId);
+    setQueueSidebarUnlocked(true);
   }
 
   const expanded = prospect !== null;
@@ -102,6 +107,7 @@ export default function Home() {
                     onClick={() => {
                       setProspect(null);
                       setCompanyInput("");
+                      setQueueSidebarUnlocked(false);
                     }}
                     className="border border-border bg-background/90 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground backdrop-blur-sm hover:text-foreground"
                   >
@@ -115,11 +121,20 @@ export default function Home() {
             </header>
 
             <main className="relative flex flex-1 flex-col items-center justify-center gap-10 py-16">
-              <PeopleGraph
-                className="absolute inset-0 z-0"
-                people={people}
-                onPersonClick={handlePersonClick}
-              />
+              {expanded ? (
+                <PeopleGraph
+                  className="absolute inset-0 z-0"
+                  people={people}
+                  onPersonClick={handlePersonClick}
+                />
+              ) : (
+                <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+                  <SignalGlobe
+                    expanded={false}
+                    className="h-[560px] w-[560px] md:h-[720px] md:w-[720px]"
+                  />
+                </div>
+              )}
 
               {!expanded ? (
                 <>
@@ -160,7 +175,7 @@ export default function Home() {
           </PageShell>
         </div>
 
-        {expanded ? <QueueSidebar /> : null}
+        {queueSidebarUnlocked ? <QueueSidebar /> : null}
       </div>
 
       {prospect ? (

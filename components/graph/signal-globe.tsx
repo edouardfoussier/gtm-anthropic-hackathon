@@ -37,6 +37,9 @@ interface SignalGlobeProps {
   onNodeClick?: (nodeId: string) => void;
 }
 
+const EMPTY_GRAPH_NODES: GraphNode[] = [];
+const EMPTY_GRAPH_LINKS: GraphLink[] = [];
+
 const DEFAULT_NODE_COUNT = 900;
 const SPHERE_RADIUS = 2.4;
 const IDLE_ROTATION_SPEED = 0.0006;
@@ -99,8 +102,8 @@ export function SignalGlobe({
   nodeCount = DEFAULT_NODE_COUNT,
   buildProgress = 1,
   companyName,
-  graphNodes = [],
-  graphLinks = [],
+  graphNodes = EMPTY_GRAPH_NODES,
+  graphLinks = EMPTY_GRAPH_LINKS,
   expanded = false,
   className,
   onNodeClick,
