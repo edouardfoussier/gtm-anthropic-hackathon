@@ -49,9 +49,9 @@ next-env.d.ts
 !/public/videos/.gitkeep
 !.env.example
 
-# autodeck pipeline (generated videos + paid-call cache)
-/pipeline/out/
-/pipeline/.cache/
+# autodeck engine (generated videos + paid-call cache)
+/engine/out/
+/engine/.cache/
 screencapture-*.png
 
 # runtime event logs (view tracking, callback requests)

@@ -9,12 +9,12 @@ import "./env.js";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { PIPELINE_DIR } from "./env.js";
+import { ENGINE_DIR } from "./env.js";
 import { JuryMemberSchema } from "./types.js";
 import type { JuryMember } from "./types.js";
 import { runPipeline } from "./pipeline.js";
 
-const DEFAULT_DATA = path.join(PIPELINE_DIR, "data", "jury.json");
+const DEFAULT_DATA = path.join(ENGINE_DIR, "data", "jury.json");
 
 async function loadMembers(source: string): Promise<JuryMember[]> {
   const raw: unknown = JSON.parse(await readFile(source, "utf8"));

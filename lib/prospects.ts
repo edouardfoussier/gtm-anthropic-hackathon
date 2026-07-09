@@ -29,7 +29,7 @@ const SENDER: Sender = {
   email: "tom@getautodeck.com",
 };
 
-const JURY_PATH = path.join(process.cwd(), "pipeline", "data", "jury.json");
+const JURY_PATH = path.join(process.cwd(), "engine", "data", "jury.json");
 
 interface JuryRecord {
   id: string;

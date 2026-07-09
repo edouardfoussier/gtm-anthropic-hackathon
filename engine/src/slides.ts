@@ -152,13 +152,13 @@ function header(ctx: SKRSContext2D, jury: JuryMember, logo: Image | null): void 
   ctx.textAlign = "left";
   ctx.fillText("AutoDeck", PAD + 44, 130);
 
-  const chipH = 66;
-  const chipY = 85;
+  const chipH = 84;
+  const chipY = 78;
 
   // Top-right: the target company's logo in a white chip (co-brand).
   if (logo) {
-    const logoH = 42;
-    const logoW = Math.min(240, logoH * (logo.width / logo.height));
+    const logoH = 60;
+    const logoW = Math.min(320, logoH * (logo.width / logo.height));
     const forLabel = "for";
     ctx.font = `600 27px ${FONT}`;
     const forW = ctx.measureText(forLabel).width;

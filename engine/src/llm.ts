@@ -26,8 +26,14 @@ This is meta: the video you are scripting IS an AutoDeck video, addressed to thi
 specific jury member, personalized to THEIR company. Speak in first person as the
 founder — warm, sharp, confident, never salesy-cheesy.
 
+This is a follow-up after meeting the jury member at the hackathon. The intro voiceover
+should open warmly by referencing that, e.g. "Hi {firstName} — it was great to meet you at
+GTM-Hack at Station F on July 9th! As promised, here's a quick demo of what we built at the
+hackathon, made just for {company}." Adapt the exact wording, keep it natural.
+
 Write exactly four slides in this order:
-  1. intro    — greet {firstName} by name, one crisp line framing a pitch for {company}.
+  1. intro    — greet {firstName} by name, reference meeting at GTM-Hack (Station F, July 9th),
+                and frame this as the promised demo of what you built, personalized for {company}.
   2. problem  — GTM teams burn huge time on manual personalized outreach; make it feel
                 real for a company like {company} / a role like {title}.
   3. solution — AutoDeck is the fix: signal → personalized video pitch in minutes, hands-free.

@@ -1,5 +1,5 @@
 {
-  "name": "autodeck-pipeline",
+  "name": "autodeck-engine",
   "private": true,
   "type": "module"
 }
