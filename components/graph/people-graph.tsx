@@ -687,11 +687,14 @@ export function PeopleGraph({
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
     }
-    window.addEventListener("resize", handleResize);
+    // Observe the mount itself, not the window — the container shrinks when
+    // the queue sidebar mounts, and the canvas must reflow with it.
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(mount);
 
     return () => {
       cancelAnimationFrame(animationFrame);
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       for (const [id, v] of visuals) removePerson(id, v);
       dustGeometry.dispose();
       dustMaterial.dispose();
