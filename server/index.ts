@@ -189,6 +189,8 @@ async function handleVideo(res: ServerResponse, requested: string): Promise<void
     });
     stream.pipe(res);
   } catch {
+    // Diagnostic: surface the exact path we tried so a 404 on an existing file is debuggable.
+    logEvent("video_miss", { requested, file_path: filePath, out_dir: OUT_DIR });
     sendJson(res, 404, { error: "not found" });
   }
 }
@@ -242,5 +244,5 @@ const server = createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  logEvent("server_start", { port: PORT });
+  logEvent("server_start", { port: PORT, out_dir: OUT_DIR });
 });
