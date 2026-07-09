@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "GetAutoDeck",
+  title: "AutoDeck",
   description:
     "The GTM autopilot: intent signal in, personalized video pitch deck in the prospect's inbox.",
 };
