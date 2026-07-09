@@ -2,43 +2,49 @@
 
 import { useMemo, useState } from "react";
 import { PageShell } from "@/components/layout/page-shell";
-import {
-  SignalGlobe,
-  type GraphLink,
-  type GraphNode,
-} from "@/components/graph/signal-globe";
+import { PeopleGraph } from "@/components/graph/people-graph";
+import type { PersonNode, PersonStatus } from "@/components/graph/types";
 import { Button } from "@/components/ui/button";
 import { ContactDrawer } from "@/components/prospect/contact-drawer";
 import { QueueSidebar } from "@/components/queue/queue-sidebar";
 import { QueueProvider } from "@/components/queue/queue-context";
 import { buildMockProspect } from "@/lib/mock-prospect";
-import type { Prospect } from "@/lib/types";
+import type { Prospect, RelationshipKind } from "@/lib/types";
 
-/** "Center" is a virtual anchor id: the company label pinned to the globe's center, not a projected node. */
-const CENTER_ANCHOR_ID = "__center__";
+/** The company itself is the graph's root node — every contact reports to it. */
+const COMPANY_ROOT_ID = "__company__";
 
-function toGraphNodes(prospect: Prospect): GraphNode[] {
-  return prospect.contacts.map((contact) => {
+const RELATIONSHIP_STATUS: Record<RelationshipKind, PersonStatus> = {
+  decision_maker: "picked",
+  champion: "enriched",
+  signal_source: "active",
+};
+
+function toPeopleNodes(prospect: Prospect): PersonNode[] {
+  const companyNode: PersonNode = {
+    id: COMPANY_ROOT_ID,
+    name: prospect.companyName,
+    title: "Target company",
+    status: "active",
+    seniority: 1,
+  };
+
+  const contactNodes: PersonNode[] = prospect.contacts.map((contact) => {
     const relationship = prospect.relationships.find(
       (r) => r.contactId === contact.id,
     );
     return {
       id: contact.id,
-      label: contact.name,
-      sublabel: contact.title,
-      kind: "contact",
-      relationshipKind: relationship?.kind,
+      name: contact.name,
+      title: contact.title,
+      status: relationship ? RELATIONSHIP_STATUS[relationship.kind] : "pending",
+      seniority: relationship?.kind === "decision_maker" ? 2 : 3,
+      reportsTo: COMPANY_ROOT_ID,
+      sublabel: contact.email,
     };
   });
-}
 
-function toGraphLinks(prospect: Prospect): GraphLink[] {
-  return prospect.relationships.map((relationship) => ({
-    id: `link-${relationship.id}`,
-    fromId: CENTER_ANCHOR_ID,
-    toId: relationship.contactId,
-    relationshipKind: relationship.kind,
-  }));
+  return [companyNode, ...contactNodes];
 }
 
 export default function Home() {
@@ -46,12 +52,8 @@ export default function Home() {
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
 
-  const graphNodes = useMemo(
-    () => (prospect ? toGraphNodes(prospect) : []),
-    [prospect],
-  );
-  const graphLinks = useMemo(
-    () => (prospect ? toGraphLinks(prospect) : []),
+  const people = useMemo(
+    () => (prospect ? toPeopleNodes(prospect) : undefined),
     [prospect],
   );
 
@@ -61,8 +63,9 @@ export default function Home() {
     setProspect(buildMockProspect(companyInput.trim()));
   }
 
-  function handleNodeClick(nodeId: string) {
-    setActiveContactId(nodeId);
+  function handlePersonClick(personId: string) {
+    if (personId === COMPANY_ROOT_ID) return;
+    setActiveContactId(personId);
   }
 
   const expanded = prospect !== null;
@@ -96,30 +99,15 @@ export default function Home() {
             </header>
 
             <main className="relative flex flex-1 flex-col items-center justify-center gap-10 py-16">
-              <div
-                className={
-                  expanded
-                    ? "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center transition-all duration-700"
-                    : "pointer-events-none absolute inset-0 -z-10 flex items-center justify-center transition-all duration-700"
-                }
-              >
-                <SignalGlobe
-                  expanded={expanded}
-                  companyName={prospect?.companyName}
-                  graphNodes={graphNodes}
-                  graphLinks={graphLinks}
-                  onNodeClick={handleNodeClick}
-                  className={
-                    expanded
-                      ? "h-[820px] w-[820px] transition-all duration-700 md:h-[980px] md:w-[980px]"
-                      : "h-[560px] w-[560px] transition-all duration-700 md:h-[720px] md:w-[720px]"
-                  }
-                />
-              </div>
+              <PeopleGraph
+                className="absolute inset-0 z-0"
+                people={people}
+                onPersonClick={handlePersonClick}
+              />
 
               {!expanded ? (
                 <>
-                  <div className="relative z-20 flex flex-col items-center gap-3 text-center">
+                  <div className="pointer-events-none relative z-20 flex flex-col items-center gap-3 text-center">
                     <span className="text-xs font-medium uppercase tracking-[0.2em] text-accent-orange">
                       01 — Target
                     </span>
