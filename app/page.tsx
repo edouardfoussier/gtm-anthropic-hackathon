@@ -2,16 +2,13 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PageShell } from "@/components/layout/page-shell";
-import { DotSphere } from "@/components/graph/dot-sphere";
+import { PeopleGraph } from "@/components/graph/people-graph";
 import {
   buildDemoFrames,
-  RUN_START_REVEAL,
   type DemoFrame,
 } from "@/components/graph/demo-frames";
 import type { PersonNode } from "@/components/graph/types";
 import { Button } from "@/components/ui/button";
-
-const IDLE_NODE_COUNT = 900;
 
 export default function Home() {
   const [companyInput, setCompanyInput] = useState("");
@@ -32,10 +29,6 @@ export default function Home() {
     [frames, cursor],
   );
   const logs = useMemo(() => applied.map((f) => f.log), [applied]);
-  const reveal = applied.reduce(
-    (r, f) => f.reveal ?? r,
-    frames ? RUN_START_REVEAL : IDLE_NODE_COUNT,
-  );
   const people = applied.reduce<PersonNode[] | undefined>(
     (p, f) => f.people ?? p,
     undefined,
@@ -64,8 +57,15 @@ export default function Home() {
   return (
     <PageShell className="flex flex-1 flex-col">
       <header className="flex items-center justify-between">
-        <span className="font-display text-xl uppercase tracking-tight">
-          AutoDeck
+        <span className="flex items-baseline gap-3">
+          <span className="font-display text-xl uppercase tracking-tight">
+            AutoDeck
+          </span>
+          {frames && runCompany ? (
+            <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              / {runCompany}
+            </span>
+          ) : null}
         </span>
         <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
           GTM Autopilot
@@ -73,14 +73,7 @@ export default function Home() {
       </header>
 
       <main className="relative flex flex-1 flex-col items-center justify-center gap-10 py-16">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <DotSphere
-            className="h-[560px] w-[560px] md:h-[720px] md:w-[720px]"
-            revealCount={reveal}
-            people={people}
-            companyLabel={frames ? (runCompany ?? undefined) : undefined}
-          />
-        </div>
+        <PeopleGraph className="absolute inset-0 z-0" people={people} />
 
         {!frames ? (
           <div className="pointer-events-none z-10 flex flex-col items-center gap-3 text-center">

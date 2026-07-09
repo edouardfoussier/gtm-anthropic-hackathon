@@ -3,33 +3,25 @@
 
 export type PersonStatus = "pending" | "active" | "picked" | "enriched" | "dim";
 
-/** One person at the target company — rendered as a satellite particle mini-sphere. */
+/** 1 = most senior (biggest node) … 4 = junior (smallest). */
+export type Seniority = 1 | 2 | 3 | 4;
+
+/** One person at the target company — rendered as a particle mini-sphere. */
 export interface PersonNode {
   id: string;
   name: string;
   title: string;
   status: PersonStatus;
+  /** Drives node size (role seniority). */
+  seniority: Seniority;
+  /** Org link: id of the manager. Absent = root, placed at the center. */
+  reportsTo?: string;
   /** Shown under the title once known (e.g. enriched email · phone). */
   sublabel?: string;
 }
 
-export interface DotSphereNode {
-  id: string;
-  /** 0..1 — reveal progress; nodes below this in build order stay hidden. */
-  revealed: boolean;
-}
-
-export interface DotSphereProps {
-  /** Total number of dots on the company sphere shell. */
-  nodeCount?: number;
-  /** Legacy reveal driver — which dots (by build order) are revealed. */
-  nodes?: DotSphereNode[];
-  /** Preferred reveal driver: how many ambient dots are lit (signals streaming in). */
-  revealCount?: number;
-  /** People found at the company — each becomes a linked satellite cluster. */
+export interface PeopleGraphProps {
+  /** People found at the company — the whole map derives from this. */
   people?: PersonNode[];
-  /** Label shown under the company sphere while a prospect run is active. */
-  companyLabel?: string;
-  radius?: number;
   className?: string;
 }

@@ -1,33 +1,37 @@
 "use client";
 
-// The contact-graph centerpiece. The big dot-sphere is the COMPANY; each
-// person found there condenses as a satellite particle mini-sphere linked to
-// the shell. All effects are opaque ink-on-paper (no bloom/additive — it dies
-// on #F7F7F5, see docs/research-SYNTHESIS-effects-plan.md).
+// The contact-graph centerpiece: a people-only org constellation. Every
+// person is a particle mini-sphere (seniority-sized) linked to their manager;
+// Claude's pick lights its reporting line orange with flowing data dots.
+// All effects are opaque ink-on-paper — no bloom/additive (dies on #F7F7F5,
+// see docs/research-SYNTHESIS-effects-plan.md).
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
-import type { DotSphereProps, PersonNode, PersonStatus } from "./types";
+import type { PeopleGraphProps, PersonNode, PersonStatus, Seniority } from "./types";
 
-export type { DotSphereNode, PersonNode } from "./types";
+export type { PersonNode } from "./types";
 
-const DEFAULT_NODE_COUNT = 900;
-const SPHERE_RADIUS = 2.4;
 const IDLE_ROTATION_SPEED = 0.0006;
-const DOT_COLOR = 0xff6500;
-const DOT_DIM_OPACITY = 0.12;
-const DOT_LIT_OPACITY = 0.85;
-
-const CLUSTER_DOTS = 70;
-const CLUSTER_RADIUS_FACTOR = 0.075;
-const ANCHOR_DIST_FACTOR = 1.55;
 const CONVERGE_SECONDS = 0.9;
 const CAMERA_IDLE_Z = 6;
-const CAMERA_PEOPLE_Z = 10;
 const FLOW_DOTS = 5;
+const LEVEL_1_DIST = 1.7;
+const LEVEL_2_DIST = 1.2;
+const DUST_COUNT = 150;
 
 const INK = new THREE.Color("#111111");
 const ORANGE = new THREE.Color("#ff6500");
+
+const TIER: Record<
+  Seniority,
+  { radius: number; dots: number; size: number; labelPad: number }
+> = {
+  1: { radius: 0.34, dots: 110, size: 3.4, labelPad: 30 },
+  2: { radius: 0.26, dots: 90, size: 3.2, labelPad: 25 },
+  3: { radius: 0.2, dots: 70, size: 3.0, labelPad: 21 },
+  4: { radius: 0.16, dots: 55, size: 2.8, labelPad: 18 },
+};
 
 const STATUS_STYLE: Record<
   PersonStatus,
@@ -87,7 +91,7 @@ const CLUSTER_FRAGMENT = /* glsl */ `
   }
 `;
 
-const FLOW_VERTEX = /* glsl */ `
+const DOT_VERTEX = /* glsl */ `
   uniform float uSize;
   void main() {
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -96,7 +100,7 @@ const FLOW_VERTEX = /* glsl */ `
   }
 `;
 
-const FLOW_FRAGMENT = /* glsl */ `
+const DOT_FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
   uniform float uOpacity;
   void main() {
@@ -136,24 +140,13 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Satellite anchor positions: golden-angle ring around the sphere, equator-biased. */
-function anchorForIndex(index: number, radius: number): THREE.Vector3 {
-  const angle = index * 2.39996 + 0.6;
-  const y = Math.sin(index * 2.1 + 0.8) * radius * 0.45;
-  const ring = radius * ANCHOR_DIST_FACTOR;
-  const horizontal = Math.sqrt(Math.max(ring * ring - y * y, 0.25));
-  return new THREE.Vector3(
-    Math.cos(angle) * horizontal,
-    y,
-    Math.sin(angle) * horizontal,
-  );
-}
-
 interface PersonVisual {
   node: PersonNode;
-  index: number;
-  anchor: THREE.Vector3; // group-local
-  shellPoint: THREE.Vector3; // group-local, on the company shell
+  anchor: THREE.Vector3; // group-local center of the cluster
+  linkFrom: THREE.Vector3; // parent cluster edge (group-local)
+  linkTo: THREE.Vector3; // own cluster edge (group-local)
+  hasLink: boolean;
+  tier: (typeof TIER)[Seniority];
   points: THREE.Points;
   clusterGeometry: THREE.BufferGeometry;
   clusterMaterial: THREE.ShaderMaterial;
@@ -176,23 +169,8 @@ interface PersonVisual {
   flowOpacity: number;
 }
 
-export function DotSphere({
-  nodeCount = DEFAULT_NODE_COUNT,
-  nodes,
-  revealCount,
-  people,
-  companyLabel,
-  radius = SPHERE_RADIUS,
-  className,
-}: DotSphereProps) {
+export function PeopleGraph({ people, className }: PeopleGraphProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-
-  const revealTarget =
-    revealCount ?? (nodes ? nodes.filter((n) => n.revealed).length : nodeCount);
-  const revealTargetRef = useRef(revealTarget);
-  useEffect(() => {
-    revealTargetRef.current = revealTarget;
-  }, [revealTarget]);
 
   const peopleRef = useRef<PersonNode[]>(people ?? []);
   const peopleVersionRef = useRef(0);
@@ -200,11 +178,6 @@ export function DotSphere({
     peopleRef.current = people ?? [];
     peopleVersionRef.current += 1;
   }, [people]);
-
-  const companyLabelRef = useRef(companyLabel ?? "");
-  useEffect(() => {
-    companyLabelRef.current = companyLabel ?? "";
-  }, [companyLabel]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -227,61 +200,47 @@ export function DotSphere({
     mount.appendChild(renderer.domElement);
 
     const labelLayer = document.createElement("div");
-    labelLayer.className =
-      "pointer-events-none absolute inset-0 overflow-hidden";
+    labelLayer.className = "pointer-events-none absolute inset-0";
     mount.appendChild(labelLayer);
 
-    // One world group: company sphere + person clusters + links rotate together.
+    // One world group: every cluster + link rotates together.
     const world = new THREE.Group();
     scene.add(world);
 
-    const positions = fibonacciSpherePoints(nodeCount, radius);
-    const opacities = new Float32Array(nodeCount).fill(DOT_DIM_OPACITY);
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("opacity", new THREE.BufferAttribute(opacities, 1));
-
-    const material = new THREE.ShaderMaterial({
+    // Idle dust field — visible while the map is empty, fades on first person.
+    const dustRand = mulberry32(7);
+    const dustPositions = new Float32Array(DUST_COUNT * 3);
+    for (let i = 0; i < DUST_COUNT; i++) {
+      const r = 0.8 + Math.pow(dustRand(), 0.6) * 2.2;
+      const theta = dustRand() * Math.PI * 2;
+      const y = (dustRand() - 0.5) * 2.6;
+      dustPositions[i * 3] = Math.cos(theta) * r;
+      dustPositions[i * 3 + 1] = y;
+      dustPositions[i * 3 + 2] = Math.sin(theta) * r;
+    }
+    const dustGeometry = new THREE.BufferGeometry();
+    dustGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(dustPositions, 3),
+    );
+    const dustMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        color: { value: new THREE.Color(DOT_COLOR) },
+        uSize: { value: 2.4 },
+        uColor: { value: ORANGE.clone() },
+        uOpacity: { value: 0 },
       },
-      vertexShader: `
-        attribute float opacity;
-        varying float vOpacity;
-        void main() {
-          vOpacity = opacity;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = 3.5 * (6.0 / -mvPosition.z);
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 color;
-        varying float vOpacity;
-        void main() {
-          vec2 coord = gl_PointCoord - vec2(0.5);
-          float edge = 1.0 - smoothstep(0.44, 0.5, length(coord));
-          if (edge < 0.01) discard;
-          gl_FragColor = vec4(color, vOpacity * edge);
-        }
-      `,
+      vertexShader: DOT_VERTEX,
+      fragmentShader: DOT_FRAGMENT,
       transparent: true,
       depthWrite: false,
     });
+    const dust = new THREE.Points(dustGeometry, dustMaterial);
+    world.add(dust);
+    let dustOpacity = 0;
 
-    const points = new THREE.Points(geometry, material);
-    world.add(points);
-
-    // Company label under the sphere.
-    const companyEl = document.createElement("div");
-    companyEl.className =
-      "absolute -translate-x-1/2 whitespace-nowrap text-xs font-medium uppercase tracking-[0.2em] text-foreground";
-    companyEl.style.display = "none";
-    labelLayer.appendChild(companyEl);
-
-    const clusterRadius = radius * CLUSTER_RADIUS_FACTOR;
     const visuals = new Map<string, PersonVisual>();
+    const childCounts = new Map<string, number>();
+    let rootCount = 0;
     let spawnCounter = 0;
     let syncedVersion = -1;
 
@@ -316,24 +275,98 @@ export function DotSphere({
       v.nameEl.style.color = accent ? "#FF6500" : "#111111";
     }
 
+    /** Deterministic hierarchical-radial placement from the reportsTo tree. */
+    function placeNode(node: PersonNode): {
+      anchor: THREE.Vector3;
+      parent: PersonVisual | null;
+    } {
+      const parent = node.reportsTo ? (visuals.get(node.reportsTo) ?? null) : null;
+
+      if (!parent) {
+        // Root(s): first at the center, extra roots on the level-1 ring.
+        if (rootCount === 0) {
+          rootCount++;
+          return { anchor: new THREE.Vector3(0, 0, 0), parent: null };
+        }
+        rootCount++;
+      }
+
+      if (parent && parent.anchor.lengthSq() > 0.01) {
+        // Level 2+: push outward near the parent's direction, fanned per sibling.
+        const index = childCounts.get(parent.node.id) ?? 0;
+        childCounts.set(parent.node.id, index + 1);
+        const dir = parent.anchor.clone().normalize();
+        const up = Math.abs(dir.y) > 0.9
+          ? new THREE.Vector3(1, 0, 0)
+          : new THREE.Vector3(0, 1, 0);
+        const u = new THREE.Vector3().crossVectors(dir, up).normalize();
+        const v = new THREE.Vector3().crossVectors(dir, u).normalize();
+        const around = index * 2.1 + 1.3;
+        const cone = 0.6;
+        const offset = dir
+          .clone()
+          .multiplyScalar(Math.cos(cone))
+          .addScaledVector(u, Math.sin(cone) * Math.cos(around))
+          .addScaledVector(v, Math.sin(cone) * Math.sin(around))
+          .normalize();
+        return {
+          anchor: parent.anchor.clone().addScaledVector(offset, LEVEL_2_DIST),
+          parent,
+        };
+      }
+
+      // Level 1 (child of the center root, or extra roots): golden-angle ring.
+      const ringKey = parent ? parent.node.id : "__roots__";
+      const index = childCounts.get(ringKey) ?? 0;
+      childCounts.set(ringKey, index + 1);
+      const angle = index * 2.39996 + 0.5;
+      const y = Math.sin(index * 2.1 + 0.7) * 0.55;
+      const horizontal = Math.sqrt(
+        Math.max(LEVEL_1_DIST * LEVEL_1_DIST - y * y, 0.25),
+      );
+      return {
+        anchor: new THREE.Vector3(
+          Math.cos(angle) * horizontal,
+          y,
+          Math.sin(angle) * horizontal,
+        ),
+        parent,
+      };
+    }
+
     function addPerson(node: PersonNode) {
-      const index = spawnCounter++;
-      const anchor = anchorForIndex(index, radius);
-      const shellPoint = anchor.clone().normalize().multiplyScalar(radius);
-      const rand = mulberry32(index * 9973 + 1);
+      const seed = spawnCounter++;
+      const tier = TIER[node.seniority];
+      const { anchor, parent } = placeNode(node);
+      const rand = mulberry32(seed * 9973 + 1);
+
+      // Link endpoints: parent cluster edge → own cluster edge.
+      const hasLink = parent !== null;
+      let linkFrom = new THREE.Vector3();
+      let linkTo = new THREE.Vector3();
+      if (parent) {
+        const dir = anchor.clone().sub(parent.anchor).normalize();
+        linkFrom = parent.anchor
+          .clone()
+          .addScaledVector(dir, parent.tier.radius * 1.35);
+        linkTo = anchor.clone().addScaledVector(dir, -tier.radius * 1.35);
+      }
 
       // Cluster targets: mini fibonacci sphere (local to the anchor).
-      const targets = fibonacciSpherePoints(CLUSTER_DOTS, clusterRadius);
-      // Starts: along the company→anchor path, so particles stream out of the
-      // company shell and condense into the person.
-      const starts = new Float32Array(CLUSTER_DOTS * 3);
-      const staggers = new Float32Array(CLUSTER_DOTS);
-      const toShell = shellPoint.clone().sub(anchor);
-      for (let i = 0; i < CLUSTER_DOTS; i++) {
-        const along = 0.15 + rand() * 0.85;
-        starts[i * 3] = toShell.x * along + (rand() - 0.5) * 0.5;
-        starts[i * 3 + 1] = toShell.y * along + (rand() - 0.5) * 0.5;
-        starts[i * 3 + 2] = toShell.z * along + (rand() - 0.5) * 0.5;
+      const targets = fibonacciSpherePoints(tier.dots, tier.radius);
+      // Starts: stream from the parent (roots: loose shell around themselves),
+      // so the org visibly grows outward.
+      const starts = new Float32Array(tier.dots * 3);
+      const staggers = new Float32Array(tier.dots);
+      const origin = parent
+        ? parent.anchor.clone().sub(anchor)
+        : new THREE.Vector3(0, 0, 0);
+      for (let i = 0; i < tier.dots; i++) {
+        const along = parent ? 0.15 + rand() * 0.85 : 1;
+        const jitter = parent ? 0.45 : 0.9;
+        starts[i * 3] = origin.x * along + (rand() - 0.5) * jitter;
+        starts[i * 3 + 1] = origin.y * along + (rand() - 0.5) * jitter;
+        starts[i * 3 + 2] = origin.z * along + (rand() - 0.5) * jitter;
         staggers[i] = rand();
       }
 
@@ -355,7 +388,7 @@ export function DotSphere({
         uniforms: {
           uProgress: { value: 0 },
           uPulse: { value: 0 },
-          uSize: { value: 3.0 },
+          uSize: { value: tier.size },
           uColor: { value: INK.clone() },
           uOpacity: { value: 0 },
         },
@@ -369,7 +402,7 @@ export function DotSphere({
       clusterPoints.position.copy(anchor);
       world.add(clusterPoints);
 
-      // Link: company shell → cluster edge, draw-in animated in the tick.
+      // Reporting-line link, draw-in animated in the tick.
       const linkGeometry = new THREE.BufferGeometry();
       linkGeometry.setAttribute(
         "position",
@@ -381,9 +414,10 @@ export function DotSphere({
         opacity: 0,
       });
       const link = new THREE.Line(linkGeometry, linkMaterial);
+      link.visible = hasLink;
       world.add(link);
 
-      // Flow dots: data traveling along the picked link.
+      // Flow dots: data traveling along the picked reporting line.
       const flowGeometry = new THREE.BufferGeometry();
       flowGeometry.setAttribute(
         "position",
@@ -395,8 +429,8 @@ export function DotSphere({
           uColor: { value: ORANGE.clone() },
           uOpacity: { value: 0 },
         },
-        vertexShader: FLOW_VERTEX,
-        fragmentShader: FLOW_FRAGMENT,
+        vertexShader: DOT_VERTEX,
+        fragmentShader: DOT_FRAGMENT,
         transparent: true,
         depthWrite: false,
       });
@@ -407,9 +441,11 @@ export function DotSphere({
 
       const visual: PersonVisual = {
         node,
-        index,
         anchor,
-        shellPoint,
+        linkFrom,
+        linkTo,
+        hasLink,
+        tier,
         points: clusterPoints,
         clusterGeometry,
         clusterMaterial,
@@ -462,12 +498,13 @@ export function DotSphere({
       for (const [id, v] of visuals) {
         if (!seen.has(id)) removePerson(id, v);
       }
+      if (visuals.size === 0) {
+        childCounts.clear();
+        rootCount = 0;
+      }
     }
 
     let animationFrame: number;
-    let revealShown = 0;
-    let lastRevealStep = -1;
-
     const timer = new THREE.Timer();
     const worldPos = new THREE.Vector3();
     const ndc = new THREE.Vector3();
@@ -485,31 +522,12 @@ export function DotSphere({
         syncPeople();
       }
 
-      // Ambient reveal: rate-limited toward the target (snaps down on replay).
-      const target = Math.min(revealTargetRef.current, nodeCount);
-      const diff = target - revealShown;
-      if (diff > 0) {
-        revealShown = Math.min(
-          target,
-          revealShown + Math.min(Math.max(diff * 1.6, 70), 150) * dt,
-        );
-      } else if (diff < 0) {
-        revealShown = target;
-      }
-      const revealStep = Math.floor(revealShown);
-      if (revealStep !== lastRevealStep) {
-        const opacityAttr = geometry.getAttribute(
-          "opacity",
-        ) as THREE.BufferAttribute;
-        for (let i = 0; i < nodeCount; i++) {
-          opacityAttr.setX(
-            i,
-            i < revealStep ? DOT_LIT_OPACITY : DOT_DIM_OPACITY,
-          );
-        }
-        opacityAttr.needsUpdate = true;
-        lastRevealStep = revealStep;
-      }
+      const smoothing = 1 - Math.exp(-dt * 6);
+
+      // Idle dust fades out as soon as the map has people.
+      const dustTarget = visuals.size === 0 ? 0.28 : 0;
+      dustOpacity += (dustTarget - dustOpacity) * smoothing;
+      dustMaterial.uniforms.uOpacity.value = dustOpacity;
 
       // World rotation (slower while people are on screen so labels stay readable).
       const rotationScale = visuals.size > 0 ? 0.45 : 1;
@@ -517,12 +535,17 @@ export function DotSphere({
       world.rotation.x = Math.sin(elapsed * 0.05) * 0.15;
       world.updateMatrixWorld();
 
-      // Camera dolly: pull back when satellites exist so the full graph fits.
-      const cameraTarget = visuals.size > 0 ? CAMERA_PEOPLE_Z : CAMERA_IDLE_Z;
+      // Camera dolly: fit the current constellation extent.
+      let extent = 1.4;
+      for (const v of visuals.values()) {
+        extent = Math.max(extent, v.anchor.length() + v.tier.radius);
+      }
+      const cameraTarget =
+        visuals.size > 0
+          ? Math.min(Math.max(extent * 2.6 + 1.2, CAMERA_IDLE_Z), 12)
+          : CAMERA_IDLE_Z;
       camera.position.z +=
         (cameraTarget - camera.position.z) * (1 - Math.exp(-dt * 2.2));
-
-      const smoothing = 1 - Math.exp(-dt * 6);
 
       for (const v of visuals.values()) {
         v.progress = Math.min(v.progress + dt / CONVERGE_SECONDS, 1);
@@ -542,46 +565,47 @@ export function DotSphere({
         uniforms.uOpacity.value = v.opacity;
         (uniforms.uColor.value as THREE.Color).copy(v.color);
 
-        // Link draw-in follows the converge animation.
-        const draw = Math.min(Math.max((v.progress - 0.1) / 0.55, 0), 1);
-        const drawEased = 1 - Math.pow(1 - draw, 3);
-        const linkAttr = v.linkGeometry.getAttribute(
-          "position",
-        ) as THREE.BufferAttribute;
-        const endX =
-          v.shellPoint.x + (v.anchor.x * 0.94 - v.shellPoint.x) * drawEased;
-        const endY =
-          v.shellPoint.y + (v.anchor.y * 0.94 - v.shellPoint.y) * drawEased;
-        const endZ =
-          v.shellPoint.z + (v.anchor.z * 0.94 - v.shellPoint.z) * drawEased;
-        linkAttr.setXYZ(0, v.shellPoint.x, v.shellPoint.y, v.shellPoint.z);
-        linkAttr.setXYZ(1, endX, endY, endZ);
-        linkAttr.needsUpdate = true;
-
-        v.linkColor.lerp(linkStyle.color, smoothing);
-        v.linkOpacity +=
-          (linkStyle.opacity * drawEased - v.linkOpacity) * smoothing;
-        v.linkMaterial.color.copy(v.linkColor);
-        v.linkMaterial.opacity = v.linkOpacity;
-
-        // Flow dots along the picked link.
-        const flowTarget = linkStyle.flow && v.progress > 0.85 ? 0.95 : 0;
-        v.flowOpacity += (flowTarget - v.flowOpacity) * smoothing;
-        v.flowMaterial.uniforms.uOpacity.value = v.flowOpacity;
-        if (v.flowOpacity > 0.02) {
-          const flowAttr = v.flowGeometry.getAttribute(
+        if (v.hasLink) {
+          // Link draw-in follows the converge animation.
+          const draw = Math.min(Math.max((v.progress - 0.1) / 0.55, 0), 1);
+          const drawEased = 1 - Math.pow(1 - draw, 3);
+          const linkAttr = v.linkGeometry.getAttribute(
             "position",
           ) as THREE.BufferAttribute;
-          for (let i = 0; i < FLOW_DOTS; i++) {
-            const t = (elapsed * 0.28 + i / FLOW_DOTS) % 1;
-            flowAttr.setXYZ(
-              i,
-              v.shellPoint.x + (v.anchor.x * 0.94 - v.shellPoint.x) * t,
-              v.shellPoint.y + (v.anchor.y * 0.94 - v.shellPoint.y) * t,
-              v.shellPoint.z + (v.anchor.z * 0.94 - v.shellPoint.z) * t,
-            );
+          linkAttr.setXYZ(0, v.linkFrom.x, v.linkFrom.y, v.linkFrom.z);
+          linkAttr.setXYZ(
+            1,
+            v.linkFrom.x + (v.linkTo.x - v.linkFrom.x) * drawEased,
+            v.linkFrom.y + (v.linkTo.y - v.linkFrom.y) * drawEased,
+            v.linkFrom.z + (v.linkTo.z - v.linkFrom.z) * drawEased,
+          );
+          linkAttr.needsUpdate = true;
+
+          v.linkColor.lerp(linkStyle.color, smoothing);
+          v.linkOpacity +=
+            (linkStyle.opacity * drawEased - v.linkOpacity) * smoothing;
+          v.linkMaterial.color.copy(v.linkColor);
+          v.linkMaterial.opacity = v.linkOpacity;
+
+          // Flow dots along the picked reporting line.
+          const flowTarget = linkStyle.flow && v.progress > 0.85 ? 0.95 : 0;
+          v.flowOpacity += (flowTarget - v.flowOpacity) * smoothing;
+          v.flowMaterial.uniforms.uOpacity.value = v.flowOpacity;
+          if (v.flowOpacity > 0.02) {
+            const flowAttr = v.flowGeometry.getAttribute(
+              "position",
+            ) as THREE.BufferAttribute;
+            for (let i = 0; i < FLOW_DOTS; i++) {
+              const t = (elapsed * 0.28 + i / FLOW_DOTS) % 1;
+              flowAttr.setXYZ(
+                i,
+                v.linkFrom.x + (v.linkTo.x - v.linkFrom.x) * t,
+                v.linkFrom.y + (v.linkTo.y - v.linkFrom.y) * t,
+                v.linkFrom.z + (v.linkTo.z - v.linkFrom.z) * t,
+              );
+            }
+            flowAttr.needsUpdate = true;
           }
-          flowAttr.needsUpdate = true;
         }
 
         // Label: project the anchor to screen space; fade on the far side.
@@ -594,25 +618,12 @@ export function DotSphere({
         } else {
           v.labelEl.style.display = "";
           v.labelEl.style.left = `${((ndc.x + 1) / 2) * w}px`;
-          v.labelEl.style.top = `${((1 - ndc.y) / 2) * h + 16}px`;
+          v.labelEl.style.top = `${((1 - ndc.y) / 2) * h + v.tier.labelPad}px`;
           const dimFactor = v.node.status === "dim" ? 0.5 : 1;
           v.labelEl.style.opacity = `${
             Math.min(v.progress * 1.6, 1) * depthFade * dimFactor
           }`;
         }
-      }
-
-      // Company label under the sphere.
-      const label = companyLabelRef.current;
-      if (label) {
-        if (companyEl.textContent !== label) companyEl.textContent = label;
-        companyEl.style.display = "";
-        worldPos.set(0, -radius - 0.45, 0).applyMatrix4(world.matrixWorld);
-        ndc.copy(worldPos).project(camera);
-        companyEl.style.left = `${((ndc.x + 1) / 2) * w}px`;
-        companyEl.style.top = `${((1 - ndc.y) / 2) * h}px`;
-      } else {
-        companyEl.style.display = "none";
       }
 
       renderer.render(scene, camera);
@@ -631,13 +642,13 @@ export function DotSphere({
       cancelAnimationFrame(animationFrame);
       window.removeEventListener("resize", handleResize);
       for (const [id, v] of visuals) removePerson(id, v);
-      geometry.dispose();
-      material.dispose();
+      dustGeometry.dispose();
+      dustMaterial.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
       labelLayer.remove();
     };
-  }, [nodeCount, radius]);
+  }, []);
 
   return <div ref={mountRef} className={cn("relative", className)} />;
 }
