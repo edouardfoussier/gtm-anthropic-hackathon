@@ -9,6 +9,7 @@ import type { DemoFrame } from "@/components/graph/demo-frames";
 import type { PersonNode, PersonStatus, Seniority } from "@/components/graph/types";
 import type { Contact, Prospect, Signal, SignalKind } from "@/lib/types";
 import type { RealProspect } from "@/lib/mock-prospect";
+import type { CachePerson, JuryRun } from "@/lib/jury-cache";
 
 interface OrgSeed {
   key: string;
@@ -169,6 +170,97 @@ export function buildDemoRun(
         s.key === PICKED_KEY
           ? toNode(s, "enriched", enrichedEmail)
           : toNode(s, "dim"),
+      ),
+    },
+  ];
+
+  return { prospect, frames };
+}
+
+const KIND_MAP: Record<string, SignalKind> = {
+  job_change: "job_change",
+  hiring: "hiring",
+  funding: "funding",
+  competitor_engagement: "competitor_engagement",
+};
+const toKind = (k: string): SignalKind => KIND_MAP[k] ?? "hiring";
+
+/**
+ * Same staged story as buildDemoRun, but from a REAL pre-baked jury run
+ * (real Sillage org + FullEnrich contact). The picked node is the jury member
+ * and carries juryId so the drawer routes into the real /reachout pipeline.
+ */
+export function buildRealRun(run: JuryRun): DemoRun {
+  const id = run.slug || slugify(run.companyName) || "prospect";
+  const cid = (k: string) => `${id}-${k}`;
+  const people = run.people;
+
+  const signals: Signal[] = run.signals.map((s, i) => ({
+    id: `${id}-signal-${i}`,
+    kind: toKind(s.kind),
+    label: s.label,
+  }));
+
+  const contacts: Contact[] = people.map((p) => ({
+    id: cid(p.key),
+    name: p.name,
+    title: p.juryId ? "Decision maker" : p.title,
+    email: p.email ?? "",
+    phone: p.phone ?? "",
+    linkedin: "",
+    ...(p.juryId ? { juryId: run.juryId } : {}),
+  }));
+
+  const relationships = people.map((p, i) => ({
+    id: `${id}-rel-${i}`,
+    contactId: cid(p.key),
+    kind:
+      p.key === run.pickedKey
+        ? ("decision_maker" as const)
+        : p.seniority <= 2
+          ? ("champion" as const)
+          : ("signal_source" as const),
+    signalId: signals[i % Math.max(1, signals.length)]?.id,
+  }));
+
+  const prospect: Prospect = {
+    id,
+    companyName: run.companyName,
+    signals,
+    contacts,
+    relationships,
+  };
+
+  const toNode = (p: CachePerson, status: PersonStatus, sublabel?: string): PersonNode => ({
+    id: cid(p.key),
+    name: p.name,
+    title: p.juryId ? "Decision maker" : p.title,
+    status,
+    seniority: p.seniority as Seniority,
+    reportsTo: p.reportsTo ? cid(p.reportsTo) : undefined,
+    sublabel,
+  });
+
+  const picked = people.find((p) => p.key === run.pickedKey) ?? people[0];
+
+  const frames: DemoFrame[] = [
+    { delay: 350, log: `Sillage · tracking ${run.companyName}` },
+    ...signals.map((s) => ({ delay: 900, log: `Sillage · signal — ${s.label}` })),
+    ...people.map((p, i) => ({
+      delay: i === 0 ? 750 : 420,
+      log: `Sillage · found ${p.name} — ${p.juryId ? "Decision maker" : p.title || "team"}`,
+      people: people.slice(0, i + 1).map((q) => toNode(q, "active")),
+    })),
+    {
+      delay: 1600,
+      log: `Claude · picked ${picked.name} (${picked.title || "Decision maker"}) — angle: ${run.signals[0]?.label ?? "high intent"}`,
+      people: people.map((p) => toNode(p, p.key === run.pickedKey ? "picked" : "dim")),
+    },
+    {
+      delay: 1500,
+      log: `FullEnrich · ${picked.email ? `${picked.email} verified ✓` : "contact verified ✓"}`,
+      people: people.map((p) =>
+        p.key === run.pickedKey ? toNode(p, "enriched", picked.email ?? undefined) : toNode(p, "dim"),
       ),
     },
   ];
