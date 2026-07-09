@@ -15,9 +15,11 @@ export type { PersonNode } from "./types";
 const IDLE_ROTATION_SPEED = 0.0006;
 const CONVERGE_SECONDS = 0.9;
 const CAMERA_IDLE_Z = 6;
+const CAMERA_MAX_Z = 14;
 const FLOW_DOTS = 5;
-const LEVEL_1_DIST = 1.7;
-const LEVEL_2_DIST = 1.2;
+const LEVEL_1_DIST = 2.2;
+const LEVEL_2_DIST = 1.55;
+const LEVEL_1_Y_SPREAD = 0.9;
 const DUST_COUNT = 150;
 
 const INK = new THREE.Color("#111111");
@@ -27,21 +29,23 @@ const TIER: Record<
   Seniority,
   { radius: number; dots: number; size: number; labelPad: number }
 > = {
-  1: { radius: 0.34, dots: 110, size: 3.4, labelPad: 30 },
-  2: { radius: 0.26, dots: 90, size: 3.2, labelPad: 25 },
-  3: { radius: 0.2, dots: 70, size: 3.0, labelPad: 21 },
-  4: { radius: 0.16, dots: 55, size: 2.8, labelPad: 18 },
+  1: { radius: 0.34, dots: 110, size: 4.4, labelPad: 26 },
+  2: { radius: 0.26, dots: 90, size: 4.1, labelPad: 22 },
+  3: { radius: 0.2, dots: 70, size: 3.8, labelPad: 19 },
+  4: { radius: 0.16, dots: 55, size: 3.5, labelPad: 17 },
 };
 
+// Base color stays ink even when picked — the orange arrives via the uAccent
+// ignition sweep (particles turn orange one by one, in stagger order).
 const STATUS_STYLE: Record<
   PersonStatus,
-  { color: THREE.Color; opacity: number; pulse: boolean }
+  { color: THREE.Color; opacity: number; pulse: boolean; accent: boolean }
 > = {
-  pending: { color: INK, opacity: 0.3, pulse: false },
-  active: { color: INK, opacity: 0.85, pulse: false },
-  picked: { color: ORANGE, opacity: 1, pulse: true },
-  enriched: { color: ORANGE, opacity: 1, pulse: true },
-  dim: { color: INK, opacity: 0.22, pulse: false },
+  pending: { color: INK, opacity: 0.3, pulse: false, accent: false },
+  active: { color: INK, opacity: 0.85, pulse: false, accent: false },
+  picked: { color: INK, opacity: 1, pulse: true, accent: true },
+  enriched: { color: INK, opacity: 1, pulse: true, accent: true },
+  dim: { color: INK, opacity: 0.22, pulse: false, accent: false },
 };
 
 const LINK_STYLE: Record<
@@ -62,6 +66,7 @@ const CLUSTER_VERTEX = /* glsl */ `
   attribute vec3 aStart;
   attribute float aStagger;
   varying float vAlpha;
+  varying float vStagger;
   float easeOutBack(float t) {
     float c1 = 1.70158;
     float c3 = c1 + 1.0;
@@ -76,18 +81,25 @@ const CLUSTER_VERTEX = /* glsl */ `
     gl_PointSize = uSize * (6.0 / -mvPosition.z) * (0.6 + 0.4 * p) * (1.0 + uPulse * 0.25);
     gl_Position = projectionMatrix * mvPosition;
     vAlpha = smoothstep(0.0, 0.2, p);
+    vStagger = aStagger;
   }
 `;
 
 const CLUSTER_FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
+  uniform vec3 uAccentColor;
+  uniform float uAccent;
   uniform float uOpacity;
   varying float vAlpha;
+  varying float vStagger;
   void main() {
     vec2 coord = gl_PointCoord - vec2(0.5);
     float edge = 1.0 - smoothstep(0.44, 0.5, length(coord));
     if (edge < 0.01) discard;
-    gl_FragColor = vec4(uColor, uOpacity * vAlpha * edge);
+    // Ignition sweep: particles flip to the accent color in stagger order.
+    float ignite = smoothstep(vStagger, vStagger + 0.25, uAccent);
+    vec3 col = mix(uColor, uAccentColor, ignite);
+    gl_FragColor = vec4(col, uOpacity * vAlpha * edge);
   }
 `;
 
@@ -161,6 +173,7 @@ interface PersonVisual {
   titleEl: HTMLDivElement;
   subEl: HTMLDivElement;
   progress: number; // 0..1 converge animation
+  accent: number; // 0..1.25 orange ignition sweep
   color: THREE.Color; // smoothed current values
   opacity: number;
   pulse: number;
@@ -255,6 +268,7 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
         "absolute -translate-x-1/2 whitespace-nowrap text-center";
       const nameEl = document.createElement("div");
       nameEl.className = "text-[11px] font-medium tracking-tight";
+      nameEl.style.transition = "color 700ms";
       const titleEl = document.createElement("div");
       titleEl.className =
         "text-[10px] uppercase tracking-[0.15em] text-muted-foreground";
@@ -302,7 +316,7 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
         const u = new THREE.Vector3().crossVectors(dir, up).normalize();
         const v = new THREE.Vector3().crossVectors(dir, u).normalize();
         const around = index * 2.1 + 1.3;
-        const cone = 0.6;
+        const cone = 0.8;
         const offset = dir
           .clone()
           .multiplyScalar(Math.cos(cone))
@@ -320,7 +334,7 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
       const index = childCounts.get(ringKey) ?? 0;
       childCounts.set(ringKey, index + 1);
       const angle = index * 2.39996 + 0.5;
-      const y = Math.sin(index * 2.1 + 0.7) * 0.55;
+      const y = Math.sin(index * 2.1 + 0.7) * LEVEL_1_Y_SPREAD;
       const horizontal = Math.sqrt(
         Math.max(LEVEL_1_DIST * LEVEL_1_DIST - y * y, 0.25),
       );
@@ -390,6 +404,8 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
           uPulse: { value: 0 },
           uSize: { value: tier.size },
           uColor: { value: INK.clone() },
+          uAccentColor: { value: ORANGE.clone() },
+          uAccent: { value: 0 },
           uOpacity: { value: 0 },
         },
         vertexShader: CLUSTER_VERTEX,
@@ -457,6 +473,7 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
         flowMaterial,
         ...label,
         progress: 0,
+        accent: 0,
         color: INK.clone(),
         opacity: 0,
         pulse: 0,
@@ -542,10 +559,12 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
       }
       const cameraTarget =
         visuals.size > 0
-          ? Math.min(Math.max(extent * 2.6 + 1.2, CAMERA_IDLE_Z), 12)
+          ? Math.min(Math.max(extent * 2.6 + 1.2, CAMERA_IDLE_Z), CAMERA_MAX_Z)
           : CAMERA_IDLE_Z;
       camera.position.z +=
         (cameraTarget - camera.position.z) * (1 - Math.exp(-dt * 2.2));
+
+      const smoothingSlow = 1 - Math.exp(-dt * 2.5);
 
       for (const v of visuals.values()) {
         v.progress = Math.min(v.progress + dt / CONVERGE_SECONDS, 1);
@@ -559,10 +578,19 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
           : 0;
         v.pulse += (pulseTarget - v.pulse) * smoothing;
 
+        // Orange ignition sweep: ramp toward 1.25 (covers every stagger) so
+        // the cluster lights up particle by particle; faster ramp back down.
+        const accentTarget = style.accent ? 1.25 : 0;
+        const accentRate = style.accent ? dt / 1.1 : dt / 0.45;
+        const accentDiff = accentTarget - v.accent;
+        v.accent +=
+          Math.sign(accentDiff) * Math.min(Math.abs(accentDiff), accentRate * 1.25);
+
         const uniforms = v.clusterMaterial.uniforms;
         uniforms.uProgress.value = v.progress;
         uniforms.uPulse.value = v.pulse;
         uniforms.uOpacity.value = v.opacity;
+        uniforms.uAccent.value = v.accent;
         (uniforms.uColor.value as THREE.Color).copy(v.color);
 
         if (v.hasLink) {
@@ -581,15 +609,17 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
           );
           linkAttr.needsUpdate = true;
 
-          v.linkColor.lerp(linkStyle.color, smoothing);
+          // Links shift color on the slow curve so the orange spreads visibly.
+          v.linkColor.lerp(linkStyle.color, smoothingSlow);
           v.linkOpacity +=
-            (linkStyle.opacity * drawEased - v.linkOpacity) * smoothing;
+            (linkStyle.opacity * drawEased - v.linkOpacity) * smoothingSlow;
           v.linkMaterial.color.copy(v.linkColor);
           v.linkMaterial.opacity = v.linkOpacity;
 
-          // Flow dots along the picked reporting line.
-          const flowTarget = linkStyle.flow && v.progress > 0.85 ? 0.95 : 0;
-          v.flowOpacity += (flowTarget - v.flowOpacity) * smoothing;
+          // Flow dots follow once the ignition sweep is underway.
+          const flowTarget =
+            linkStyle.flow && v.progress > 0.85 && v.accent > 0.5 ? 0.95 : 0;
+          v.flowOpacity += (flowTarget - v.flowOpacity) * smoothingSlow;
           v.flowMaterial.uniforms.uOpacity.value = v.flowOpacity;
           if (v.flowOpacity > 0.02) {
             const flowAttr = v.flowGeometry.getAttribute(

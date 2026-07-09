@@ -54,6 +54,14 @@ export default function Home() {
     setAutoPlaying(true);
   }
 
+  function handleNewTarget() {
+    setFrames(null);
+    setCursor(0);
+    setAutoPlaying(false);
+    setRunCompany(null);
+    setCompanyInput("");
+  }
+
   return (
     <PageShell className="flex flex-1 flex-col">
       <header className="flex items-center justify-between">
@@ -90,25 +98,23 @@ export default function Home() {
           <div className="flex-1" />
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className={
-            frames
-              ? "z-10 flex w-full max-w-md items-center gap-2 border-b border-foreground/20 pb-3"
-              : "z-10 flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 pb-3"
-          }
-        >
-          <input
-            type="text"
-            value={companyInput}
-            onChange={(e) => setCompanyInput(e.target.value)}
-            placeholder="Target a company…"
-            className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
-          />
-          <Button type="submit" size="lg">
-            Find signal
-          </Button>
-        </form>
+        {!frames ? (
+          <form
+            onSubmit={handleSubmit}
+            className="z-10 flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 pb-3"
+          >
+            <input
+              type="text"
+              value={companyInput}
+              onChange={(e) => setCompanyInput(e.target.value)}
+              placeholder="Target a company…"
+              className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
+            />
+            <Button type="submit" size="lg">
+              Find signal
+            </Button>
+          </form>
+        ) : null}
 
         {logs.length > 0 ? (
           <div className="absolute bottom-2 left-0 z-10 flex w-full max-w-sm flex-col gap-1.5">
@@ -159,6 +165,13 @@ export default function Home() {
               className="transition-colors hover:text-accent-orange"
             >
               Replay
+            </button>
+            <button
+              type="button"
+              onClick={handleNewTarget}
+              className="transition-colors hover:text-accent-orange"
+            >
+              New target
             </button>
           </div>
         ) : null}
