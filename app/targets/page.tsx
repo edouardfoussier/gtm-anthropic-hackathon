@@ -21,8 +21,8 @@ export default async function TargetsPage() {
           </span>
           <h1 className="text-4xl leading-[0.95] md:text-5xl">Who to reach.</h1>
           <p className="max-w-2xl text-base text-muted-foreground">
-            Your book of accounts, ranked by intent. Elizabeth at Photoroom is
-            heating up — reach out before the window closes.
+            Your book of accounts, ranked by real-time intent from Sillage. Deel
+            is on a public hiring tear — reach out before the window closes.
           </p>
         </div>
 

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { getJuryContact } from "@/lib/jury-contacts";
 
 /**
  * Prospect record backing a /v/[id] share page. Reads the generated jury list
@@ -17,6 +18,8 @@ export interface Prospect {
   lastName: string;
   company: string;
   title: string;
+  /** From FullEnrich (git-ignored PII overlay); empty when unknown. */
+  email: string;
   /** From FullEnrich when available; empty string means "let the prospect fill it". */
   phone: string;
   videoUrl: string;
@@ -78,13 +81,15 @@ export async function getProspect(id: string): Promise<Prospect | null> {
   // When a remote engine renders + hosts the videos, load them from it; otherwise
   // they're served from the app's own public/videos.
   const engineBase = process.env.ENGINE_API_URL?.trim().replace(/\/+$/, "") ?? "";
+  const contact = getJuryContact(rec.id);
   return {
     id: rec.id,
     firstName: rec.firstName,
     lastName: rec.lastName,
     company: rec.company,
     title: rec.title ?? "",
-    phone: rec.phone ?? "",
+    email: contact.email ?? "",
+    phone: contact.phone ?? rec.phone ?? "",
     videoUrl: `${engineBase}/videos/${rec.id}.mp4`,
     posterUrl: `${engineBase}/videos/${rec.id}.jpg`,
     sender: SENDER,

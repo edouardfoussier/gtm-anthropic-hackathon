@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { appendEvent } from "@/lib/events";
 import { getProspect } from "@/lib/prospects";
+import { getJuryContact } from "@/lib/jury-contacts";
 import { sendPitchEmail } from "@/lib/email";
 
 /**
@@ -46,7 +47,12 @@ export async function POST(req: Request): Promise<NextResponse> {
   const posterUrl = prospect.posterUrl.startsWith("http")
     ? prospect.posterUrl
     : `${appUrl}${prospect.posterUrl}`;
-  const to = body.to ?? defaultRecipient();
+  // The prospect's real email is PII (git-ignored overlay). Double-gated so tests never
+  // hit a judge's inbox: use it only when the caller passes an explicit `to`, or when
+  // ALLOW_PROSPECT_EMAIL=1 is set (for the live demo). Otherwise fall back to self/test.
+  const prospectEmail =
+    process.env.ALLOW_PROSPECT_EMAIL === "1" ? getJuryContact(prospect.id).email : undefined;
+  const to = body.to ?? prospectEmail ?? defaultRecipient();
 
   const result = await sendPitchEmail({
     to,
