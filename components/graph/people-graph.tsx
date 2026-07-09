@@ -304,6 +304,7 @@ export function PeopleGraph({
       const labelEl = document.createElement("div");
       labelEl.className =
         "absolute -translate-x-1/2 whitespace-nowrap text-center pointer-events-auto cursor-pointer";
+      labelEl.dataset.personLabel = personId;
       labelEl.addEventListener("click", () => {
         onPersonClickRef.current?.(personId);
       });
@@ -587,15 +588,31 @@ export function PeopleGraph({
     let userControlled = false;
     let lastInteraction = 0;
 
+    // Drag starts pending: we only capture the pointer (which would swallow the
+    // label's click) once the cursor actually moves past a small threshold, so a
+    // plain click on a person still fires and queues them.
+    const DRAG_THRESHOLD_PX = 4;
+    let pendingPointerId: number | null = null;
+
     function onPointerDown(e: PointerEvent) {
-      dragging = true;
-      userControlled = true;
+      // Let clicks on a person label through — don't arm the drag on them.
+      if ((e.target as HTMLElement).closest("[data-person-label]")) return;
+      pendingPointerId = e.pointerId;
       lastPointerX = e.clientX;
       lastPointerY = e.clientY;
-      mount.setPointerCapture(e.pointerId);
-      mount.style.cursor = "grabbing";
     }
     function onPointerMove(e: PointerEvent) {
+      if (pendingPointerId === e.pointerId && !dragging) {
+        if (
+          Math.abs(e.clientX - lastPointerX) + Math.abs(e.clientY - lastPointerY) <
+          DRAG_THRESHOLD_PX
+        )
+          return;
+        dragging = true;
+        userControlled = true;
+        mount.setPointerCapture(e.pointerId);
+        mount.style.cursor = "grabbing";
+      }
       if (!dragging) return;
       manualYaw += (e.clientX - lastPointerX) * DRAG_SPEED;
       manualPitch += (e.clientY - lastPointerY) * DRAG_SPEED;
@@ -604,10 +621,12 @@ export function PeopleGraph({
       lastPointerY = e.clientY;
     }
     function onPointerUp(e: PointerEvent) {
+      pendingPointerId = null;
       if (!dragging) return;
       dragging = false;
       lastInteraction = performance.now();
-      mount.releasePointerCapture(e.pointerId);
+      if (mount.hasPointerCapture(e.pointerId))
+        mount.releasePointerCapture(e.pointerId);
       mount.style.cursor = "grab";
     }
     mount.style.cursor = "grab";
