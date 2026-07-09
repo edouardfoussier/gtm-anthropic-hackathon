@@ -1,8 +1,16 @@
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+
 # AutoDeck — Agent Guide
 
 **AutoDeck** turns an intent signal into a **personalized video pitch deck in the prospect's inbox**: Sillage finds the moment and the person, FullEnrich finds the coordinates, Claude picks the target and writes the story, Gamma builds the deck, Gradium speaks it in the seller's cloned voice, an avatar presents it, and the seller gets a live "your prospect is watching" cha-ching the second it's opened. It's not a deck generator — it's an **autopilot**: pipeline that makes itself.
 
 This file is the **single source of truth** for working in this repo today. It is normative (new work follows it, never imitates code that violates it) and living (learned something durable? update this file in the same change). Companion doc: `AUTODECK-BRIEF.md` (full brief); where they disagree, **this file wins**.
+
+**Updating this file is append-only for choices.** Every product, architecture, or tooling decision gets a new numbered entry appended to the Decision log (newest last) — never rewrite or delete an old entry; supersede it ("Supersedes D00X"). Reference sections (stack table, folder tree, adapter facts, gotchas) are updated in place to stay true, and the decision that changed them gets logged.
 
 ## The event (context every agent needs)
 
@@ -35,7 +43,7 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 
 | Layer | Choice |
 |---|---|
-| App | Next.js (App Router) + TypeScript strict + Tailwind + shadcn/ui |
+| App | Next.js **16.2.10** (App Router) + React 19.2 + TypeScript strict + Tailwind **v4** + shadcn/ui (base-nova preset) |
 | Theme | Light, premium, salesy. ONE accent: electric blue `#2563EB`. **NOT orange.** |
 | Graph | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down |
 | LLM | AI SDK (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured outputs (`Output.object`) |
@@ -53,8 +61,11 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 npm install
 npm run dev                 # app on :3000
 npx tsc --noEmit            # typecheck — must pass before every commit
+npm run lint                # eslint 9 flat config
+npm run build               # production build
 npx tsx engine/<script>.ts  # run a pipeline script standalone
 npx tsx scripts/smoke.ts    # THE demo-path smoke run — re-run after every change
+npx shadcn@latest add <component>   # add shadcn/ui components
 ```
 
 ## Architecture
@@ -83,11 +94,11 @@ npx tsx scripts/smoke.ts    # THE demo-path smoke run — re-run after every cha
 
 ```
 app/            # routes + API — thin wiring only; long jobs spawn engine scripts via npx tsx
-components/     # UI; components/graph/ = Three.js scene behind data-only props
-lib/            # adapters (sillage, fullenrich, gamma, email) + claude steps (orchestrator, research, script)
+components/     # UI; components/graph/ = Three.js scene behind data-only props; components/ui/ = shadcn
+lib/            # adapters (sillage, fullenrich, gamma, email) + claude steps (orchestrator, research, script) + utils.ts (shadcn cn)
 engine/         # EDOUARD'S LANE — standalone tsx scripts: tts.ts, assemble.ts, avatar.ts
-data/           # prospects/{id}.json · slides/{id}/*.png  ← the lane contract
-public/videos/  # {id}.mp4 + {id}.jpg  ← engine output
+data/           # prospects/{id}.json · slides/{id}/*.png  ← the lane contract (gitignored, .gitkeep'd)
+public/videos/  # {id}.mp4 + {id}.jpg  ← engine output (gitignored)
 scripts/        # smoke.ts and other throwaway runners
 ```
 
@@ -127,16 +138,19 @@ Every adapter (`sillage.ts`, `fullenrich.ts`, `gamma.ts`) ships a **realistic de
 **Relaxed today:**
 
 - Commit **early and often to `main`**; every commit runnable so we can roll back live. No PR ceremony, no branch policing.
-- No unit-test suite. **One smoke script (`scripts/smoke.ts`) exercising the demo path** — re-run after every change. A broken demo found at minute 5 is fixable; at minute 55 it is not.
+- No unit-test suite. **One smoke script (`scripts/smoke.ts`) exercising the demo path** — re-run after every change, and every new demo step adds its check there. A broken demo found at minute 5 is fixable; at minute 55 it is not.
 - Comments/polish/refactors only on the demo path. Cut scope, not the demo path.
 
-**Video pipeline gotchas (hard-won — violating these costs an hour each):**
+**Tooling gotchas (hard-won — violating these costs an hour each):**
 
+- Next.js 16 differs from training data — **read `node_modules/next/dist/docs/` before writing framework code** (see block at top).
+- shadcn CLI changed: `npx shadcn@latest init -y -d` (base-nova preset), `npx shadcn@latest add <component>` — old flags like `--base-color` are gone.
 - ffmpeg concat **FILTER**, never the demuxer (inputs differ); normalize each input with `setsar=1` + `yuv420p`.
 - Ken-Burns `zoompan`: **pre-composite the still to ONE frame first**, or it renders d× frames per input.
 - **Never `-shortest`** when muxing VO — it truncates the outro.
 - `tsx -e` breaks on top-level await → use script files.
 - Next.js only auto-loads `.env.local` → engine scripts load their own env; run Playwright/ffmpeg from the engine dir.
+- `create-next-app` writes its own `AGENTS.md` — it clobbered this file once already (restored). Careful when hoisting scaffolds.
 
 ## Timing strategy
 
@@ -147,16 +161,8 @@ Every adapter (`sillage.ts`, `fullenrich.ts`, `gamma.ts`) ships a **realistic de
 
 ## Env vars (`.env.local` — never commit)
 
-```
-ANTHROPIC_API_KEY=            # hackathon credits ($100/participant)
-SILLAGE_MCP_URL=              # + auth details handed at kickoff
-FULLENRICH_API_KEY=           # Bearer, from app.fullenrich.com/app/api
-GAMMA_API_KEY=                # X-API-KEY header
-GRADIUM_API_KEY=              # + GRADIUM_VOICE_ID=<cloned voice>  (promo code GTM-HACK)
-FAL_KEY=
-RESEND_API_KEY=               # + EMAIL_FROM=<verified sender>
-APP_URL=http://localhost:3000 # or the tunnel/Vercel URL for live email links
-```
+See `.env.example` (committed, kept in sync — it is the authoritative list):
+`ANTHROPIC_API_KEY` · `SILLAGE_MCP_URL` · `FULLENRICH_API_KEY` · `GAMMA_API_KEY` · `GRADIUM_API_KEY` + `GRADIUM_VOICE_ID` · `FAL_KEY` · `RESEND_API_KEY` + `EMAIL_FROM` · `APP_URL`
 
 ## Build order (8h, 2 lanes)
 
@@ -178,7 +184,7 @@ APP_URL=http://localhost:3000 # or the tunnel/Vercel URL for live email links
 - [ ] v1: prompt input proposes companies · v2: orchestrator upgraded to agentic tool-use loop
 - [ ] Fallback video recorded; posts drafted with sponsor tags
 
-## Decision log
+## Decision log (append-only, newest last)
 
 - **D001** — 2026-07-09 — Graph is vanilla Three.js in a React component behind a data-only interface. Rejected: react-flow (brief §3) — team wants the 3D wow; the interface keeps a 2D fallback cheap.
 - **D002** — 2026-07-09 — Orchestrator staged: v0 hybrid (deterministic adapters + one Claude structured pick) → v2 agentic tool-use loop after v0 works. Rejected: agent-loop-first (too slow to debug on demo day).
@@ -187,3 +193,4 @@ APP_URL=http://localhost:3000 # or the tunnel/Vercel URL for live email links
 - **D005** — 2026-07-09 — Full video scope: Gamma + Gradium voice + fal.ai avatar PIP. Rejected: voice-only (loses wow + weakens Gradium prize story).
 - **D006** — 2026-07-09 — Video pipeline rebuilt from scratch in `engine/` (Diffender reuse code unavailable in this repo); its gotchas kept as rules above.
 - **D007** — 2026-07-09 — npm; in-memory + JSON state; no DB, no test suite — one smoke script for the demo path.
+- **D008** — 2026-07-09 — Scaffold live at repo root: create-next-app (Next 16.2.10, React 19.2.4, Tailwind v4, ESLint 9, `--app --no-src-dir`, alias `@/*`) + shadcn/ui init (`-d`, base-nova) + deps `three ai @ai-sdk/anthropic zod resend @fal-ai/client` (+ dev: `@types/three tsx`). Lane folders + `.gitkeep`s created; `data/*` and `public/videos/*` gitignored; `.env.example` committed; `scripts/smoke.ts` seeded. Typecheck + build + smoke all pass.
