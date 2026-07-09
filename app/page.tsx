@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/layout/page-shell";
 import { AppNav } from "@/components/layout/app-nav";
@@ -15,6 +15,19 @@ import type { RealProspect } from "@/lib/mock-prospect";
 import { buildDemoRun } from "@/lib/demo-run";
 import type { Prospect } from "@/lib/types";
 
+// The in-progress run is saved here so leaving for a draft (/reachout) and
+// coming back — via the browser arrows or the Graph nav link — restores the
+// graph exactly where it was left. Cleared on "New search". sessionStorage:
+// gone when the tab closes, so a fresh demo tab always starts clean.
+const RUN_STORAGE_KEY = "autodeck:run";
+
+interface StoredRun {
+  companyInput: string;
+  prospect: Prospect;
+  frames: DemoFrame[];
+  cursor: number;
+}
+
 function HomeInner() {
   const router = useRouter();
   const { enqueue, items } = useQueue();
@@ -24,8 +37,47 @@ function HomeInner() {
   const [cursor, setCursor] = useState(0);
   const [autoPlaying, setAutoPlaying] = useState(false);
   const [realProspects, setRealProspects] = useState<RealProspect[]>([]);
-  // The pipeline queue sidebar stays hidden until the visitor queues someone.
-  const [queueSidebarUnlocked, setQueueSidebarUnlocked] = useState(false);
+  // Gate persistence until we've attempted to restore, so the initial empty
+  // state can't overwrite a run saved by a previous view.
+  const restoredRef = useRef(false);
+
+  // Restore a saved run on mount (client only → no hydration mismatch: the
+  // server renders the idle state, we swap to the run once mounted). One-shot
+  // sync — the intended exception to the "no setState in effect" rule.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(RUN_STORAGE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as StoredRun;
+        if (saved.prospect && Array.isArray(saved.frames)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only hydration
+          setCompanyInput(saved.companyInput ?? "");
+          setProspect(saved.prospect);
+          setFrames(saved.frames);
+          setCursor(saved.cursor ?? saved.frames.length);
+          setAutoPlaying(false);
+        }
+      }
+    } catch {
+      /* corrupt/absent saved run — start fresh */
+    }
+    restoredRef.current = true;
+  }, []);
+
+  // Persist the run on every change (after the restore attempt).
+  useEffect(() => {
+    if (!restoredRef.current || typeof window === "undefined") return;
+    try {
+      if (prospect && frames) {
+        const payload: StoredRun = { companyInput, prospect, frames, cursor };
+        window.sessionStorage.setItem(RUN_STORAGE_KEY, JSON.stringify(payload));
+      } else {
+        window.sessionStorage.removeItem(RUN_STORAGE_KEY);
+      }
+    } catch {
+      /* storage disabled — run still lives in memory for this view */
+    }
+  }, [companyInput, prospect, frames, cursor]);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +133,7 @@ function HomeInner() {
     setCursor(0);
     setAutoPlaying(false);
     setCompanyInput("");
-    setQueueSidebarUnlocked(false);
+    // The persistence effect clears the saved run once prospect is null.
   }
 
   function handlePersonClick(personId: string) {
@@ -95,7 +147,6 @@ function HomeInner() {
       return;
     }
     enqueue(prospect.companyName, contact);
-    setQueueSidebarUnlocked(true);
   }
 
   const expanded = prospect !== null;
@@ -227,7 +278,7 @@ function HomeInner() {
         </PageShell>
       </div>
 
-      {queueSidebarUnlocked ? <QueueSidebar /> : null}
+      {items.length > 0 ? <QueueSidebar /> : null}
     </div>
   );
 }
