@@ -6,12 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "typecheck:engine": "tsc -p engine/tsconfig.json",
+    "generate": "tsx engine/src/cli.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.10",
     "@base-ui/react": "^1.6.0",
     "@fal-ai/client": "^1.10.1",
+    "@napi-rs/canvas": "^0.1.100",
     "ai": "^7.0.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

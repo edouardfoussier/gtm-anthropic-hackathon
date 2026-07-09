@@ -48,3 +48,12 @@ next-env.d.ts
 !/data/slides/.gitkeep
 !/public/videos/.gitkeep
 !.env.example
+
+# autodeck engine (generated videos + paid-call cache)
+/engine/out/
+/engine/.cache/
+screencapture-*.png
+
+# runtime event logs (view tracking, callback requests) + generation jobs
+/data/events/
+/data/jobs/

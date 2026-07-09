@@ -1,0 +1,24 @@
+[
+  {
+    "id": "jane-acme",
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "company": "Acme Robotics",
+    "title": "VP of Sales",
+    "email": "jane@acme.example",
+    "phone": "+33600000000",
+    "linkedin": "https://www.linkedin.com/in/janedoe",
+    "companyDomain": "acme.example"
+  },
+  {
+    "id": "marc-northwind",
+    "firstName": "Marc",
+    "lastName": "Bernard",
+    "company": "Northwind Analytics",
+    "title": "Head of Revenue Operations",
+    "email": "marc@northwind.example",
+    "phone": "+33600000001",
+    "linkedin": "https://www.linkedin.com/in/marcbernard",
+    "companyDomain": "northwind.example"
+  }
+]

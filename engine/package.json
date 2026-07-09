@@ -1,0 +1,5 @@
+{
+  "name": "autodeck-engine",
+  "private": true,
+  "type": "module"
+}
