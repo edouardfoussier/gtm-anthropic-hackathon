@@ -1,4 +1,5 @@
 import { PageShell } from "@/components/layout/page-shell";
+import { AppNav } from "@/components/layout/app-nav";
 import { Dashboard } from "@/components/dashboard/dashboard";
 
 export const metadata = {
@@ -8,12 +9,7 @@ export const metadata = {
 export default function DashboardPage() {
   return (
     <PageShell className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between">
-        <span className="font-display text-xl uppercase tracking-tight">AutoDeck</span>
-        <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          Dashboard
-        </span>
-      </header>
+      <AppNav />
 
       <main className="flex flex-1 flex-col gap-8 py-12">
         <div className="flex flex-col gap-3">

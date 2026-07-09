@@ -567,17 +567,20 @@ export function PeopleGraph({
       // Camera dolly: fit height and width separately (wide screens can keep
       // the camera much closer, so clusters render bigger).
       const halfTan = Math.tan((camera.fov * Math.PI) / 360);
+      // Margins include room for the DOM labels hanging off each cluster —
+      // clusters must never touch the canvas edge (the queue sidebar shrinks
+      // the container at runtime).
       let maxY = 0.8;
       let maxH = 1.2;
       for (const v of visuals.values()) {
-        maxY = Math.max(maxY, Math.abs(v.anchor.y) + v.tier.radius + 0.55);
+        maxY = Math.max(maxY, Math.abs(v.anchor.y) + v.tier.radius + 0.8);
         maxH = Math.max(
           maxH,
-          Math.hypot(v.anchor.x, v.anchor.z) + v.tier.radius + 0.4,
+          Math.hypot(v.anchor.x, v.anchor.z) + v.tier.radius + 1.0,
         );
       }
       const needZ =
-        Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.12 + 1.0;
+        Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.15 + 1.0;
       const cameraTarget =
         visuals.size > 0
           ? Math.min(Math.max(needZ, CAMERA_IDLE_Z), CAMERA_MAX_Z)
@@ -687,11 +690,14 @@ export function PeopleGraph({
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
     }
-    window.addEventListener("resize", handleResize);
+    // Observe the mount itself, not the window — the container shrinks when
+    // the queue sidebar mounts, and the canvas must reflow with it.
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(mount);
 
     return () => {
       cancelAnimationFrame(animationFrame);
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       for (const [id, v] of visuals) removePerson(id, v);
       dustGeometry.dispose();
       dustMaterial.dispose();
