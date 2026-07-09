@@ -1,3 +1,5 @@
+> ⚠️ **HISTORICAL BRIEF — superseded by `AGENTS.md` wherever they differ.** Known deltas: graph is **vanilla Three.js** (not react-flow); FullEnrich is **v2** (§5's v1 URL is dead); Sillage is **MCP or V2 API**; the §7 reuse paths are **unavailable** (pipeline rebuilt in `engine/`); colors are **not locked**. Read `AGENTS.md` first.
+
 # AutoDeck — One-Shot Build Brief
 
 > **Agentic GTM Hackathon** · Station F, Paris · **TODAY, one day**: build 9:30 → submission 17:30 → pitch 18:00.

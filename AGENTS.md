@@ -1,9 +1,3 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
-
 # AutoDeck — Agent Guide
 
 **AutoDeck** turns an intent signal into a **personalized video pitch deck in the prospect's inbox**: Sillage finds the moment and the person, FullEnrich finds the coordinates, Claude picks the target and writes the story, Gamma builds the deck, Gradium speaks it in the seller's cloned voice, an avatar presents it, and the seller gets a live "your prospect is watching" cha-ching the second it's opened. It's not a deck generator — it's an **autopilot**: pipeline that makes itself.
@@ -20,6 +14,8 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 - Judging: 4 × 25 pts — business impact · depth of Anthropic use · depth of Sillage/FullEnrich use · presentation.
 - Bonus prizes we chase: **Best Use of Gamma ($1000)**, **Best Use of Gradium ($500)**, Most Creative GTM Angle, Crowd Favorite (loudest demo — DB-meter, hence the LOUD cha-ching).
 - Submission: 2-min demo video + GitHub repo + short description. Pitch rounds are 1:30 pitch + 1:30 demo.
+
+
 
 ## The judged demo script — every technical choice serves this
 
@@ -39,21 +35,28 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 - **v2 (only after v0 is solid E2E):** upgrade the orchestrator to a real **agentic tool-use loop** — Claude gets Sillage MCP tools + FullEnrich as tools and decides what to fetch and who to target. This is the "depth of AI use" points.
 - **Autopilot toggle:** signal feed auto-enqueues prospects and shows decks auto-generating.
 
+
+
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| App | Next.js **16.2.10** (App Router) + React 19.2 + TypeScript strict + Tailwind **v4** + shadcn/ui (base-nova preset) |
-| Theme | Light, premium, salesy. ONE accent: electric blue `#2563EB`. **NOT orange.** |
-| Graph | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down |
-| LLM | AI SDK (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured outputs (`Output.object`) |
-| Sillage | **MCP client** (AI SDK `experimental_createMCPClient`, streamable-HTTP/SSE) — no public REST API |
-| FullEnrich | REST **v2** (Bearer) |
-| Package manager | **npm** — do not switch |
-| State | In-memory + JSON files in `data/` — no DB |
-| Email | Resend (video as **link, never attachment**) |
-| Live notify | SSE (or simple polling) |
-| Video tooling | ffmpeg + Playwright, local, run from `engine/` |
+
+| Layer           | Choice                                                                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App             | Next.js **16.2.10** (App Router) + React 19.2 + TypeScript strict + Tailwind **v4**                                                                                                        |
+| UI components   | shadcn/ui initialized (base-nova preset, **Base UI — not Radix**) — **PROVISIONAL, not locked**: component-layer deep research pending; don't build deep dependencies on its internals yet |
+| Design          | **LOCKED:** light, premium, salesy style; the **Three.js node graph is the visual centerpiece** of the product. Colors only: to define (D011).                                             |
+| Graph           | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down                         |
+| LLM             | AI SDK (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured outputs (`Output.object`)                                                                                         |
+| Sillage         | **MCP client OR V2 API** — whichever access lands first at kickoff; adapter interface is the invariant                                                                                     |
+| FullEnrich      | REST **v2** (Bearer)                                                                                                                                                                       |
+| Package manager | **npm** — do not switch                                                                                                                                                                    |
+| State           | In-memory + JSON files in `data/` — no DB                                                                                                                                                  |
+| Email           | Resend (video as **link, never attachment**)                                                                                                                                               |
+| Live notify     | SSE (or simple polling)                                                                                                                                                                    |
+| Video tooling   | ffmpeg + Playwright, local, run from `engine/`                                                                                                                                             |
+
+
+
 
 ## Commands
 
@@ -68,11 +71,13 @@ npx tsx scripts/smoke.ts    # THE demo-path smoke run — re-run after every cha
 npx shadcn@latest add <component>   # add shadcn/ui components
 ```
 
+
+
 ## Architecture
 
 ```
 [Company name OR sector prompt] → POST /api/prospect
-   ├─ lib/sillage.ts     → getSignals(company), getPeople(company)   (Sillage MCP, mock fallback)
+   ├─ lib/sillage.ts     → getSignals(company), getPeople(company)   (Sillage MCP/API, mock fallback)
    ├─ lib/orchestrator.ts→ Claude: rank people, pick best contact, write angle (structured output)
    ├─ lib/fullenrich.ts  → enrichContact(person) → {email, phone, linkedin, title}  (v2 API, mock fallback)
    └─ data/prospects/{id}.json → graph nodes stream to UI
@@ -102,21 +107,27 @@ public/videos/  # {id}.mp4 + {id}.jpg  ← engine output (gitignored)
 scripts/        # smoke.ts and other throwaway runners
 ```
 
+
+
 ### Team lanes & the contract between them
 
 - **Lane A — Mathis + Tom:** app, graph UI, adapters, orchestrator, send/share/tracking, Autopilot.
 - **Lane B — Edouard:** everything in `engine/` (rebuilt from scratch — the old Diffender code is not in this repo). Merges to `main` continuously.
 - **File-based contract (do not break it):** engine reads `data/prospects/{id}.json` + `data/slides/{id}/*.png`, writes `public/videos/{id}.mp4` + `public/videos/{id}.jpg`. Each side can build and test against fixture files without the other.
 
+
+
 ## Partner adapters — exact facts (verified 2026-07-09)
 
-- **Sillage** (`lib/sillage.ts`): **MCP only.** Server URL + auth handed at kickoff (login with the registered email; workspace at hackathon.getsillage.com, ≤20 tracked accounts). Connect via AI SDK MCP client; wrap tools as `getSignals(company) → Signal[]` and `getPeople(company) → Person[]`. **Write against the mock first**, plug the real MCP the moment access lands. In v2, hand the MCP tools to Claude directly.
-- **FullEnrich** (`lib/fullenrich.ts`): **v2 API** — docs: https://docs.fullenrich.com (index: `/llms.txt`). `POST https://app.fullenrich.com/api/v2/contact/enrich/bulk`, `Authorization: Bearer`. Async waterfall → poll `GET /api/v2/contact/enrich/bulk` (skip webhooks). Key from https://app.fullenrich.com/app/api. Also: `POST /api/v2/people/search` + `/api/v2/company/search` for v1 prospecting. The brief's v1 URL is outdated — use v2.
-- **Gamma** (`lib/gamma.ts`): `POST https://public-api.gamma.app/v1.0/generations` — header **`X-API-KEY`** (NOT Bearer). Body: `{ inputText, textMode, format: "presentation", numCards: 6-8, exportAs: "png" }`. Poll `GET /v1.0/generations/{id}` until done → `gammaUrl` + `exportUrl` (signed, ~1 week). **Surface `gammaUrl` in the UI** ("open in Gamma") — visible Gamma love for the prize. Docs: https://developers.gamma.app
+- **Sillage** (`lib/sillage.ts`): **MCP or V2 API — both are valid; use whichever access lands first at kickoff.** No public docs (verified: docs are participant-gated; MCP docs + V2 API key link handed at kickoff; workspace at hackathon.getsillage.com, ≤20 tracked accounts, login with registered email; API key via app settings). The invariant is the adapter interface: `getSignals(company) → Signal[]`, `getPeople(company) → Person[]` — transport (MCP client via AI SDK `experimental_createMCPClient`, or REST) is an implementation detail behind it. **Write against the mock first.** In v2, if on MCP, hand the tools to Claude directly.
+- **FullEnrich** (`lib/fullenrich.ts`): **v2 API** — docs: [https://docs.fullenrich.com](https://docs.fullenrich.com) (index: `/llms.txt`). `POST https://app.fullenrich.com/api/v2/contact/enrich/bulk`, `Authorization: Bearer`. Async waterfall → poll `GET /api/v2/contact/enrich/bulk` (skip webhooks). Key from [https://app.fullenrich.com/app/api](https://app.fullenrich.com/app/api). Also: `POST /api/v2/people/search` + `/api/v2/company/search` for v1 prospecting. The brief's v1 URL is outdated — use v2.
+- **Gamma** (`lib/gamma.ts`): `POST https://public-api.gamma.app/v1.0/generations` — header `X-API-KEY` (NOT Bearer). Body: `{ inputText, textMode, format: "presentation", numCards: 6-8, exportAs: "png" }`. Poll `GET /v1.0/generations/{id}` until done → `gammaUrl` + `exportUrl` (signed, ~1 week). **Surface** `gammaUrl` **in the UI** ("open in Gamma") — visible Gamma love for the prize. Docs: [https://developers.gamma.app](https://developers.gamma.app)
 - **Gradium** (`engine/tts.ts`): `POST https://api.gradium.ai/api/post/speech/tts`, header `x-api-key`, body `{ text, voice_id, output_format: "wav", only_audio: true, model_name: "default" }`. Voice id from `GRADIUM_VOICE_ID` (cloned voice).
 - **fal.ai** (`engine/avatar.ts`): `@fal-ai/client`, `fal.subscribe(MODEL, { input, logs })` with a talking-head model; ~66s audio works in one call.
 - **Anthropic**: AI SDK + `@ai-sdk/anthropic` only. **Never route image content through OpenRouter — broken serialization. Anthropic-native only.**
 - **Resend** (`lib/email.ts`): sender domain via env; onboarding sender as fallback. Video always a **link** to `/v/{id}` — deliverability.
+
+
 
 ## Mocks-first policy (non-negotiable)
 
@@ -137,42 +148,50 @@ Every adapter (`sillage.ts`, `fullenrich.ts`, `gamma.ts`) ships a **realistic de
 
 **Relaxed today:**
 
-- Commit **early and often to `main`**; every commit runnable so we can roll back live. No PR ceremony, no branch policing.
-- No unit-test suite. **One smoke script (`scripts/smoke.ts`) exercising the demo path** — re-run after every change, and every new demo step adds its check there. A broken demo found at minute 5 is fixable; at minute 55 it is not.
+- Commit **early and often to** `main`; every commit runnable so we can roll back live. No PR ceremony, no branch policing.
+- No unit-test suite. **One smoke script (**`scripts/smoke.ts`**) exercising the demo path** — re-run after every change, and every new demo step adds its check there. A broken demo found at minute 5 is fixable; at minute 55 it is not.
 - Comments/polish/refactors only on the demo path. Cut scope, not the demo path.
 
 **Tooling gotchas (hard-won — violating these costs an hour each):**
 
-- Next.js 16 differs from training data — **read `node_modules/next/dist/docs/` before writing framework code** (see block at top).
+- Next.js 16 differs from training data — **read** `node_modules/next/dist/docs/` **before writing framework code**.
 - shadcn CLI changed: `npx shadcn@latest init -y -d` (base-nova preset), `npx shadcn@latest add <component>` — old flags like `--base-color` are gone.
 - ffmpeg concat **FILTER**, never the demuxer (inputs differ); normalize each input with `setsar=1` + `yuv420p`.
 - Ken-Burns `zoompan`: **pre-composite the still to ONE frame first**, or it renders d× frames per input.
-- **Never `-shortest`** when muxing VO — it truncates the outro.
+- **Never** `-shortest` when muxing VO — it truncates the outro.
 - `tsx -e` breaks on top-level await → use script files.
 - Next.js only auto-loads `.env.local` → engine scripts load their own env; run Playwright/ffmpeg from the engine dir.
 - `create-next-app` writes its own `AGENTS.md` — it clobbered this file once already (restored). Careful when hoisting scaffolds.
+
+
 
 ## Timing strategy
 
 - **Live on stage:** input → graph → Send → cha-ching (seconds, safe). Full chain: never live.
 - **~15:00:** find jury/sponsor company names → pre-generate their decks + videos.
-- **By 15:00:** email links must be reachable from the jury's phone → deploy share page to Vercel OR run a tunnel (`cloudflared`/ngrok). **Test from a phone on 4G.**
+- **Deploy: Vercel (locked, D014).** The app (share page `/v/{id}` + tracking API) deploys to Vercel early. Constraint: **video generation stays LOCAL** — ffmpeg/Playwright/engine scripts don't run on Vercel — so pre-baked videos must reach the deployed app (commit + deploy, or Vercel Blob) before the demo. **Test email links from a phone on 4G by 15:00.**
 - Record a **full-run screen capture**: fallback video + material for the X/LinkedIn posts (tag @Anthropic @Sillage @FullEnrich, `#agenticgtm` — two more prizes).
+
+
 
 ## Env vars (`.env.local` — never commit)
 
 See `.env.example` (committed, kept in sync — it is the authoritative list):
-`ANTHROPIC_API_KEY` · `SILLAGE_MCP_URL` · `FULLENRICH_API_KEY` · `GAMMA_API_KEY` · `GRADIUM_API_KEY` + `GRADIUM_VOICE_ID` · `FAL_KEY` · `RESEND_API_KEY` + `EMAIL_FROM` · `APP_URL`
+`ANTHROPIC_API_KEY` · `SILLAGE_MCP_URL` / `SILLAGE_API_KEY` (either enables the real adapter) · `FULLENRICH_API_KEY` · `GAMMA_API_KEY` · `GRADIUM_API_KEY` + `GRADIUM_VOICE_ID` · `FAL_KEY` · `RESEND_API_KEY` + `EMAIL_FROM` · `APP_URL`
 
-## Build order (8h, 2 lanes)
+## Build order (2 lanes, steps in strict order — riskiest integration first)
 
-| When | Lane A — Mathis + Tom (app) | Lane B — Edouard (engine/) |
-|---|---|---|
-| 9:30–10:30 | Scaffold app + theme + Three.js graph w/ mocks | Gradium TTS client + chaching.mp3 + assemble.ts skeleton (fixture slides) |
-| 10:30–12:30 | Real Sillage MCP + FullEnrich v2 adapters + orchestrator (Claude pick) + drawer | Gamma adapter → PNG slides → assembled video E2E |
-| 12:30–14:00 | Send (Resend) + share page + tracking + SSE cha-ching | Avatar PIP integrated; first full video |
-| 14:00–15:30 | Autopilot toggle + v1 prompt input + deploy/tunnel + phone test | Pre-generate jury-company videos |
-| 15:30–17:30 | **Submission**, fallback recording, pitch rehearsal, viral posts | Buffer |
+
+| Step | Lane A — Mathis + Tom (app)                                                 | Lane B — Edouard (engine/)                                                |
+| ---- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1    | ~~Scaffold app + theme~~ ✅ + Three.js graph w/ mocks                        | Gradium TTS client + chaching.mp3 + assemble.ts skeleton (fixture slides) |
+| 2    | Real Sillage + FullEnrich v2 adapters + orchestrator (Claude pick) + drawer | Gamma adapter → PNG slides → assembled video E2E                          |
+| 3    | Send (Resend) + share page + tracking + SSE cha-ching                       | Avatar PIP integrated; first full video                                   |
+| 4    | Autopilot toggle + v1 prompt input + Vercel deploy + phone test             | Pre-generate jury-company videos                                          |
+| 5    | **Submission**, fallback recording, pitch rehearsal, viral posts            | Buffer                                                                    |
+
+
+(Deadlines live in "The event" and "Timing strategy" — steps here carry no clock.)
 
 ## Definition of done
 
@@ -184,6 +203,25 @@ See `.env.example` (committed, kept in sync — it is the authoritative list):
 - [ ] v1: prompt input proposes companies · v2: orchestrator upgraded to agentic tool-use loop
 - [ ] Fallback video recorded; posts drafted with sponsor tags
 
+
+
+## Open vs locked — quick glance
+
+**Deliberately open (decide later, never hardcode in the meantime):**
+
+- Colors / palette (D011) — define during theme work
+- UI component layer (D010) — shadcn provisional, keep usage shallow
+- Graph layout algorithm (radial vs force-directed vs hybrid) — Lane A prototypes, then logs the pick
+- Avatar model + narration voice — **Edouard's call** (D013)
+- Email sender address / domain — must be decided **before the 15:00 phone deliverability test** (D013)
+- Demo assets: presenter photo, chaching.mp3 — open (D013)
+
+**Confirmed working rules (D014):**
+
+- Graph animates **progressively** — nodes land as each adapter returns; slow enrichment never blocks the moment.
+- Target/jury companies are added to the Sillage workspace **at kickoff** (≤20 accounts) so signals have time to populate.
+- App deploys on **Vercel**; video generation stays local (see Timing strategy).
+
 ## Decision log (append-only, newest last)
 
 - **D001** — 2026-07-09 — Graph is vanilla Three.js in a React component behind a data-only interface. Rejected: react-flow (brief §3) — team wants the 3D wow; the interface keeps a 2D fallback cheap.
@@ -193,4 +231,11 @@ See `.env.example` (committed, kept in sync — it is the authoritative list):
 - **D005** — 2026-07-09 — Full video scope: Gamma + Gradium voice + fal.ai avatar PIP. Rejected: voice-only (loses wow + weakens Gradium prize story).
 - **D006** — 2026-07-09 — Video pipeline rebuilt from scratch in `engine/` (Diffender reuse code unavailable in this repo); its gotchas kept as rules above.
 - **D007** — 2026-07-09 — npm; in-memory + JSON state; no DB, no test suite — one smoke script for the demo path.
-- **D008** — 2026-07-09 — Scaffold live at repo root: create-next-app (Next 16.2.10, React 19.2.4, Tailwind v4, ESLint 9, `--app --no-src-dir`, alias `@/*`) + shadcn/ui init (`-d`, base-nova) + deps `three ai @ai-sdk/anthropic zod resend @fal-ai/client` (+ dev: `@types/three tsx`). Lane folders + `.gitkeep`s created; `data/*` and `public/videos/*` gitignored; `.env.example` committed; `scripts/smoke.ts` seeded. Typecheck + build + smoke all pass.
+- **D008** — 2026-07-09 — Scaffold live at repo root: create-next-app (Next 16.2.10, React 19.2.4, Tailwind v4, ESLint 9, `--app --no-src-dir`, alias `@/`*) + shadcn/ui init (`-d`, base-nova) + deps `three ai @ai-sdk/anthropic zod resend @fal-ai/client` (+ dev: `@types/three tsx`). Lane folders + `.gitkeep`s created; `data/*` and `public/videos/*` gitignored; `.env.example` committed; `scripts/smoke.ts` seeded. Typecheck + build + smoke all pass.
+- **D009** — 2026-07-09 — Sillage transport: **MCP or V2 API, both valid** — use whichever access lands first at kickoff; the `getSignals`/`getPeople` adapter interface is the invariant, transport hidden behind it. Env: `SILLAGE_MCP_URL` or `SILLAGE_API_KEY` enables the real adapter (absent → mock). Docs are participant-gated (nothing public — verified 2026-07-09). Partially supersedes D003 (which locked MCP-only).
+- **D010** — 2026-07-09 — UI component layer **NOT locked**: shadcn/ui is initialized (base-nova preset, Base UI under the hood — not Radix) and usable, but the choice is provisional pending a component-layer deep research. Until then: add components only via `npx shadcn@latest add`, keep usage shallow (no reliance on internals), so swapping stays cheap. `shadcn` CLI moved to devDependencies.
+- **D011** — 2026-07-09 — Colors **unlocked, to define** during theme work. Supersedes the brief §3 mandate — that reasoning was Diffender-specific. The "ONE accent color" principle stays.
+- **D012** — 2026-07-09 — Design **locked as design, not colors**: light/premium/salesy style + the Three.js node graph as the visual centerpiece (with D001). Only the palette stays open (D011).
+- **D013** — 2026-07-09 — Delegated/open by team choice: fal.ai avatar model + narration voice are **Edouard's call** (Lane B); email sender domain and demo assets (presenter photo, chaching.mp3) stay **open** — sender must be settled before the phone deliverability test. Graph layout algorithm also open (Lane A prototypes first). `AUTODECK-BRIEF.md` got a superseded-banner so no agent follows its outdated instructions.
+- **D014** — 2026-07-09 — **Vercel deploy locked** for the app (share page + tracking); video generation stays local (ffmpeg/Playwright can't run there) — pre-baked videos reach production via commit+deploy or Vercel Blob. Confirmed working rules: progressive graph animation (nodes land per adapter); Sillage workspace gets the target/jury companies at kickoff. Supersedes the tunnel-vs-Vercel day-of decision.
+
