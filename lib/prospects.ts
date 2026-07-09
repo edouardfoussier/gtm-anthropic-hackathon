@@ -39,6 +39,28 @@ interface JuryRecord {
   title?: string;
 }
 
+export interface ProspectSummary {
+  id: string;
+  firstName: string;
+  lastName: string;
+  company: string;
+}
+
+export async function getAllProspects(): Promise<ProspectSummary[]> {
+  try {
+    const raw = await readFile(JURY_PATH, "utf8");
+    const records = JSON.parse(raw) as JuryRecord[];
+    return records.map((r) => ({
+      id: r.id,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      company: r.company,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getProspect(id: string): Promise<Prospect | null> {
   let raw: string;
   try {

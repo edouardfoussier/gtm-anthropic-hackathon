@@ -17,8 +17,9 @@ import { VIDEO_W, VIDEO_H } from "./ffmpeg.js";
 import { DATA_DIR } from "./env.js";
 import type { Deck, JuryMember, Slide, SlideKind } from "./types.js";
 
-const ACCENT = "#2563EB";
-const ACCENT_SOFT = "#DBE4FF";
+// Editorial brand — orange accent, matching the web app's design system.
+const ACCENT = "#FF6500";
+const ACCENT_SOFT = "#FFE1CC";
 const INK = "#0F172A";
 const MUTE = "#475569";
 const FAINT = "#94A3B8";
@@ -132,14 +133,14 @@ function drawWrapped(
 function background(ctx: SKRSContext2D): void {
   const bg = ctx.createLinearGradient(0, 0, VIDEO_W * 0.6, VIDEO_H);
   bg.addColorStop(0, "#FFFFFF");
-  bg.addColorStop(1, "#EAF0FF");
+  bg.addColorStop(1, "#F4F1EC");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
 
   // Soft accent orb, top-right, for depth.
   const orb = ctx.createRadialGradient(VIDEO_W - 220, 180, 60, VIDEO_W - 220, 180, 900);
-  orb.addColorStop(0, "rgba(37,99,235,0.16)");
-  orb.addColorStop(1, "rgba(37,99,235,0)");
+  orb.addColorStop(0, "rgba(255,101,0,0.14)");
+  orb.addColorStop(1, "rgba(255,101,0,0)");
   ctx.fillStyle = orb;
   ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
 }
