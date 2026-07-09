@@ -15,11 +15,11 @@ export type { PersonNode } from "./types";
 const IDLE_ROTATION_SPEED = 0.0006;
 const CONVERGE_SECONDS = 0.9;
 const CAMERA_IDLE_Z = 6;
-const CAMERA_MAX_Z = 14;
+const CAMERA_MAX_Z = 18;
 const FLOW_DOTS = 5;
-const LEVEL_1_DIST = 2.2;
-const LEVEL_2_DIST = 1.55;
-const LEVEL_1_Y_SPREAD = 0.9;
+const LEVEL_1_DIST = 3.0;
+const LEVEL_2_DIST = 2.1;
+const LEVEL_1_Y_SPREAD = 1.1;
 const DUST_COUNT = 150;
 
 const INK = new THREE.Color("#111111");
@@ -29,10 +29,10 @@ const TIER: Record<
   Seniority,
   { radius: number; dots: number; size: number; labelPad: number }
 > = {
-  1: { radius: 0.34, dots: 110, size: 4.4, labelPad: 26 },
-  2: { radius: 0.26, dots: 90, size: 4.1, labelPad: 22 },
-  3: { radius: 0.2, dots: 70, size: 3.8, labelPad: 19 },
-  4: { radius: 0.16, dots: 55, size: 3.5, labelPad: 17 },
+  1: { radius: 0.44, dots: 130, size: 5.0, labelPad: 30 },
+  2: { radius: 0.34, dots: 105, size: 4.7, labelPad: 25 },
+  3: { radius: 0.26, dots: 82, size: 4.4, labelPad: 21 },
+  4: { radius: 0.2, dots: 62, size: 4.0, labelPad: 19 },
 };
 
 // Base color stays ink even when picked — the orange arrives via the uAccent
@@ -552,14 +552,23 @@ export function PeopleGraph({ people, className }: PeopleGraphProps) {
       world.rotation.x = Math.sin(elapsed * 0.05) * 0.15;
       world.updateMatrixWorld();
 
-      // Camera dolly: fit the current constellation extent.
-      let extent = 1.4;
+      // Camera dolly: fit height and width separately (wide screens can keep
+      // the camera much closer, so clusters render bigger).
+      const halfTan = Math.tan((camera.fov * Math.PI) / 360);
+      let maxY = 0.8;
+      let maxH = 1.2;
       for (const v of visuals.values()) {
-        extent = Math.max(extent, v.anchor.length() + v.tier.radius);
+        maxY = Math.max(maxY, Math.abs(v.anchor.y) + v.tier.radius + 0.55);
+        maxH = Math.max(
+          maxH,
+          Math.hypot(v.anchor.x, v.anchor.z) + v.tier.radius + 0.4,
+        );
       }
+      const needZ =
+        Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.12 + 1.0;
       const cameraTarget =
         visuals.size > 0
-          ? Math.min(Math.max(extent * 2.6 + 1.2, CAMERA_IDLE_Z), CAMERA_MAX_Z)
+          ? Math.min(Math.max(needZ, CAMERA_IDLE_Z), CAMERA_MAX_Z)
           : CAMERA_IDLE_Z;
       camera.position.z +=
         (cameraTarget - camera.position.z) * (1 - Math.exp(-dt * 2.2));
