@@ -1,136 +1,225 @@
-# Backfire — Agent Guide
+# <Project Name> — Agent Guide
 
-Hackathon build (7h, demo at 18:00). Backfire maps competitive contagion across a customer account galaxy, arms defense plays gated on verified contacts, and reallocates Sillage tracking slots as a counter-strike. Product concept, judging context, and demo script live in `PRODUCT.md`. This file is the engineering source of truth: read it before any task, update it in the same change when a durable decision or constraint appears.
+<!-- ─────────────────────────────────────────────────────────────────────
+HOW TO USE THIS TEMPLATE (delete this comment block once filled in)
 
-## Core flow (what the code implements)
+1. Replace every <angle-bracket> placeholder. Delete sections that truly
+   don't apply — but keep the principles; they are stack-agnostic.
+2. Create a one-line `CLAUDE.md` next to this file containing exactly:
+       @AGENTS.md
+   Claude Code auto-loads CLAUDE.md; Codex and Cursor read AGENTS.md
+   directly. AGENTS.md is the single source of truth — never let them drift.
+3. For a hackathon: fill "Project context" with the track statement and
+   demo scenario, keep the "Hackathon mode" section at the bottom.
+   For a long-lived project: delete "Hackathon mode".
+──────────────────────────────────────────────────────────────────────── -->
+
+<One paragraph: what this project is, who it serves, and the single outcome
+that matters. E.g. "Agent that fuses live translated status calls with a
+persistent task ledger so a site office always knows what is blocked.">
+
+This file is the single source of truth for working in this repo. Read it before starting any task. It is:
+
+- **Normative** — the current implementation may not satisfy every rule yet; new work must move the codebase *toward* these practices, never imitate existing code that violates them.
+- **Living** — when you learn something durable (architecture decision, constraint, incident, convention), update this file **in the same change**. Do not use hidden memory as a substitute for updating this file.
+
+## Project context
+
+<What the product does, end to end. Domain vocabulary the code must align
+with. The core flow as a short diagram or numbered list. For a hackathon:
+paste the track statement verbatim here, then state your chosen scenario,
+which capability is load-bearing (the thing the demo cannot work without),
+and the judging criteria you are optimizing for.>
 
 ```
-POST /api/scan
-  └── adapters/sillage: fetch signals for book accounts
-        └── agents/strategist: infer adversary playbook from trigger signal
-              └── agents/critic: per-neighbor contagion test
-                  (precomputed Claude similarity + targeted sillage calls)
-                    └── core: Verdict { accountId, state, evidence[] }
-                          └── exposed accounts → agents/playwright: defense play
-                                └── adapters/fullenrich: verify contact
-                                    play stays "frozen" until verified → "armed"
-POST /api/go/:playId
-  └── unlocks draft generation for that play only (no send path exists)
-POST /api/reallocate
-  └── agents/quartermaster: move Sillage slots defense ↔ counter-fire,
-      justification required per move
-GET /api/state → full galaxy + plays + audit log (UI polls this)
+<core flow, e.g.:>
+<Input (voice / event / user action)>
+  └── <processing step — which API/primitive, what it produces>
+        └── <state held where, keyed by what>
+              └── <output surfaced to whom, how>
 ```
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
-| Language | TypeScript 5.x strict, single Next.js App Router app |
-| Package manager | pnpm. Do not switch |
-| State | In-memory store behind an interface. `data/` = mock book JSON, `fixtures/` = recorded MCP responses. No DB |
-| LLM | Anthropic SDK. Model name in one named constant in `src/core/constants.ts` |
-| MCP | Sillage + FullEnrich, called from API routes via adapters only |
-| Validation | Zod on every MCP response and every LLM output |
-| Front | D3 force layout on 2D canvas. Fallback: clustered static grid. No 3D |
-| Tests | `pnpm smoke` = the demo path against fixtures |
+| Language(s) | <TypeScript 5.x strict / Python 3.12+ typed> |
+| Framework | <Next.js App Router / FastAPI / ...> |
+| Package manager | <npm / pnpm / uv> — do not switch without approval |
+| Data / state | <Postgres + Prisma / SQLite / in-memory store behind an interface> |
+| LLM / external APIs | <provider + model, links to docs> |
+| Validation | <Zod / Pydantic> — all external input parsed at the boundary |
+| Tests | <Vitest / pytest> |
+| Lint / format / types | <ESLint + Prettier + tsc / Ruff + Pyright> |
 
 ## Commands
 
 ```bash
-pnpm install
-pnpm dev
-pnpm smoke            # demo path on fixtures; run after EVERY change
-pnpm smoke:live       # same path, live MCPs; costs credits, use sparingly
-pnpm typecheck        # tsc --noEmit
-pnpm lint
-pnpm build
+<install>            # e.g. pnpm install / uv sync
+<dev>                # run the app locally
+<test>               # full test suite
+<test-focused>       # single file / keyword filter
+<typecheck>          # tsc --noEmit / pyright
+<lint>               # check-only
+<build>              # production build
 ```
 
 ## Architecture
 
 ```
+<project structure tree, 2 levels deep, one comment per folder, e.g.:>
 src/
-  app/          # routes + API endpoints. Wiring only, no business logic
-  core/         # pure domain: states, verdicts, slot budget math, constants. No IO
-  agents/       # strategist / critic / playwright / quartermaster: prompts, schemas, loop
-  adapters/     # sillage, fullenrich, anthropic, fixture-replay. Interfaces only
-  components/   # galaxy canvas, play panel, counter-fire panel, GO flow
-data/           # mock CRM book. Frozen after 11:00 (demo script depends on ids)
-fixtures/       # recorded real MCP responses. PROTECTED: regenerate, never hand-edit
+  app/          # thin routes / entry points — wiring only, no business logic
+  core/         # pure domain logic — no IO, no framework, no model calls
+  services/     # business logic + transaction boundaries, typed inputs/outputs
+  adapters/     # external systems (APIs, DB, storage) behind interfaces
+  components/   # UI, private feature folders behind a public barrel
 ```
 
-Non-negotiable rules:
+Non-negotiable structural rules:
 
-- **Dependencies point inward only.** Routes call agents; agents call core and adapters. No SDK call in core, no business logic in routes or components.
-- **States are discriminated unions with a legal-transition map.** Account: `unknown | attacked | exposed | cleared`. Play: `frozen | armed | go | draft_ready`. A play cannot reach `armed` without a verified contact; `draft_ready` is only reachable from `go`. Make illegal transitions unrepresentable, not runtime-checked.
-- **Parse at the boundary.** Zod schema on every MCP response and every LLM reply before it reaches logic or UI. Malformed LLM output degrades to a visible `verdict_pending` state, never a crash.
-- **Time-box every external call**: LLM 60s, MCP 20s, one retry, then fall through to the fixture. A hung call must not hang the request.
-- **Fixture-or-live is one adapter decision** behind `DEMO_MODE=live|replay`. In `live` mode, every successful MCP call is recorded to `fixtures/`. Business code never knows which it got.
-- **No scaffolding.** Only folders with real code behind them. Not on the demo path = not built today.
+- **Dependencies point inward only.** Entry points call services; services call the domain core and adapters. If you feel the need to put an HTTP concern in a service, business logic in a route, or an external SDK call in the pure core — **stop and rethink the layer** before writing code.
+- **Monolith tripwire:** a module past ~300–400 lines, or a function juggling unrelated concerns, gets split into a focused sibling module — not another method.
+- **Raise domain-specific errors in the core; translate them to HTTP status / CLI exit / UI state exactly once** at the transport boundary. Never scatter status handling through business logic.
+- **Time-box every external call** (LLM, API, DB, storage). One slow dependency must not be able to hang a request. Never hold a transaction, session, or lock open across an external call.
+- **Make impossible states impossible.** Model state machines as discriminated unions plus a legal-transition map, not loose booleans. Stable IDs over list positions.
+- **Parse external input at the boundary.** URL params, env vars, uploaded files, LLM output, webhook payloads — validate into typed domain values before they reach logic.
+- **Don't scaffold.** Create only folders and abstractions with real code behind them. No speculative seams, empty directories, or pre-built flexibility the flow doesn't need yet.
 
-## Before writing code
+## Take a step back before writing code
 
-1. `rg` first: has this already been built? SDK and MCP quickstarts exist, use them.
-2. Is this on the demo path? If not, stop.
-3. Right layer? An MCP concern leaking into core or a component means stop and rethink.
+Before implementing, answer:
 
-A 20-second question to the team beats a 2-hour wrong implementation. Restate the goal in one line, flag the risky assumption, disagree and commit.
+1. **Has this already been built?** Grep first (`rg`). Duplication is the most common agent failure.
+2. **Does this file already encode the answer?** Re-read the relevant section.
+3. **Is this the right layer for the change?**
+4. **Will this create or extend a monolith?** If a module is near the tripwire, split first.
+5. **Is the test value real?** A unit test that mocks everything it touches is noise.
+
+When in doubt, ask — a 20-second clarification beats a 2-hour wrong implementation. Challenge before you build: restate the goal in one line, flag risky or underspecified assumptions, propose the alternative with its tradeoff. Once the user decides, disagree and commit.
 
 ## Quality rules
 
-- No `any` / `as any` / double casts / non-null assertions. Fix the type or model the state.
-- Guard clauses first, max 3 nesting levels, one responsibility per function.
-- Named constants for thresholds: similarity cutoff, slot count, timeouts, model name.
-- Comments capture business decisions only (e.g. "send path intentionally does not exist"). Never narrate code.
-- Secrets in env vars only; server-side keys never reach the client. Never log prompts, tokens, or enriched contact values (emails/mobiles are PII: log `verified: boolean` + provider count, never the values).
-- LLM output is a draft until parsed. This app performs **no external writes**; the only mutation is internal state after a human GO.
+These override personal style and anything the existing code happens to do.
 
-## Logging (spec, not optional: the audit log is a UI feature)
+### Typing
 
-Structured events, stable `snake_case` names, start + completion pairs carrying ids and `duration_ms`: `playbook_inference_*`, `contagion_test_*`, `verdict_emitted`, `enrichment_verified`, `slot_reallocated`, `draft_unlocked`. `GET /api/state` exposes this log; the front renders it as the agent audit trail. Aggregate counts in loops, no per-row logging.
+- No `any` / `as any`, anywhere — including ORM writes. Fix types properly: narrow, add a type guard, add a generic parameter, or update the interface.
+- No double casts (`value as unknown as T`) and no non-null assertions to silence uncertainty — fix the upstream type or model the empty/loading/error state explicitly.
+- Annotate generic type parameters explicitly when constructing from external data (`new Set<string>(data)`).
+- Python: full type hints on every function, modern syntax (`list[str]`, `X | None`), no `Any`, avoid `cast()` and bare `type: ignore`.
+
+### Code shape
+
+- Guard clauses first; max ~3 levels of nesting. One responsibility per function.
+- Named constants for thresholds, batch sizes, retries — no magic numbers.
+- Descriptive names over abbreviations; prefer a self-explanatory name over a comment.
+- **Comments capture business decisions only** — a product constraint, an external-system requirement, a deliberate deviation from the obvious approach. Never narrate what the code does, and no "added for task X" trailers.
+- **Helper migration discipline:** when introducing a helper, grep for every inline duplicate of the logic it replaces and migrate them all in the same PR. A helper that coexists with the raw pattern it abstracts is worse than no helper.
+- **Remove dead code.** If you migrate all call sites, delete the old function — no deprecated wrappers, shims, or `// removed` comments. Grep to confirm zero callers before committing.
+
+### Security
+
+- Secrets live in env vars / secret manager only. Server-side keys never reach the client (never `NEXT_PUBLIC_*` or equivalent), never get committed, never appear in logs or error messages.
+- Never log secrets, tokens, auth headers, PII, raw user content, or full prompts.
+- Auth fails closed in production. A secret URL is not auth.
+- Validate all external input with schemas; parse and validate LLM output before acting on it. LLM output is a draft until confirmed — **no uncontrolled AI writes** to external systems.
+- Do not weaken auth, scopes, tests, or safety checks to make CI pass.
+
+### Logging
+
+- Structured events with stable `snake_case` names. Emit a start event and a completion event carrying identifiers and `duration_ms`, so a hung step is visible as a start without its matching completion.
+- Aggregate counts instead of logging per-row/per-frame inside loops.
 
 ## Testing
 
-`pnpm smoke` seeds the book, replays fixtures, runs the full loop, and asserts: final galaxy states, at least one `cleared` account, one `armed` play, one slot reallocation, and that no `draft_ready` exists without a prior GO. Re-run after every change. Never weaken it to make it pass.
+Every non-trivial change ships with meaningful tests. A change without them is incomplete. Never weaken or delete a test to make it pass.
 
-## Git
+**Think before writing a test.** For the unit under change, answer: (1) what is its contract? (2) what are the edge cases — empty, single, duplicate, `None`/zero/negative, unicode, stale state, races? (3) what are the failure modes — timeout, constraint violation, malformed input? (4) what invariant must always hold? (5) what would catch the bug a future refactor introduces? If you cannot answer these, you do not understand the code well enough to change it.
 
-- Commit early and often to `main`. Every commit leaves `pnpm smoke` green (live rollback points).
-- Conventional Commits, imperative, English. No `Co-Authored-By` or tool-attribution lines.
-- No force pushes, no destructive git operations.
+- Coverage is by **value, not percentage**. High-value paths get a happy path + one test per edge case + one per failure mode; thin passthroughs get none.
+- **Mutation-test mindset:** if flipping `>` to `>=` or deleting a guard clause would still pass the suite, the tests are weak.
+- Arrange / Act / Assert with blank lines between phases. Name tests after **behavior**, not the function. One behavior per test — if the name needs an "and", split it.
+- **Mock at the boundary only** (external APIs, LLM calls, time, network) — never the unit under test or internal helpers. Assert observable outcomes (returned values, state, status codes), not internal calls.
+- LLM evals are a separate, explicitly-marked tier (slow, costs credits) — excluded from the default test run.
+- Test-data scripts and throwaway verification code are means-to-verify, **not part of the change** — do not commit them.
+
+### Validation gate — run before any handoff
+
+```bash
+<typecheck>
+<lint>          # check-only; never auto-fix or reformat as part of a commit
+<test>
+<build>
+```
+
+If a command cannot be run, say why and state the residual risk. **Do not assume previous results are still valid** — every change can regress something, so re-run after every change, even "trivial" ones.
+
+## Git workflow
+
+- One dedicated branch per feature/fix: `<type>/<slug>` (e.g. `feat/live-translate-channel`). No `wip`, `patch-1`, or tool-generated names. One branch, one concern, one PR — no stacked PRs unless explicitly requested.
+- **Conventional Commits** (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`), scoped when a scope is clear, imperative mood, body when there's meaningful context or tradeoffs. All repo artifacts (comments, commits, PR text) in **English**, regardless of the conversation language.
+- **No `Co-Authored-By` or tool-attribution lines** in commits, PR bodies, or squash descriptions. Commit messages describe the change, not the tooling. Strip accidental trailers before push.
+- **Stop before commit.** Implement, validate, then stop and report: summary, changed files, validation results, residual risks, open questions. Commit and open the PR only after explicit approval.
+- **Never merge a PR yourself.** Merging is a human-only action, no matter how green CI is.
+- **No force pushes, no destructive git operations.** `push --force` (even `--force-with-lease`), `reset --hard`, `clean -f`, `rebase` on pushed branches, deleting branches with unmerged work, or anything that rewrites shared history requires explicit approval first.
+- PR title: `<type>: <summary>`. PR body: exactly `## Context`, `## Implementation`, `## Checks / QA`. The QA section lists only commands actually run and concrete reviewer verification steps with expected outcomes — and states explicitly what was **not** tested.
+- UI-affecting changes: include before/after screenshots in the PR body. No screenshots, no PR.
 
 ## Agent rules
 
-- Read affected files before editing. Small, verifiable changes. Only the requested scope.
-- New dependencies require team approval (one message).
-- **Do not trust internal knowledge for Sillage MCP, FullEnrich MCP, or the Anthropic SDK.** Read the tool schemas from the MCP handshake and installed package docs before writing integration code. Record hour-1 findings in the Decision log.
-- Protected paths: `fixtures/` (regenerate only), `data/` after 11:00.
-- No destructive commands without explicit approval.
+- Read the affected files before editing them. Keep changes small and verifiable.
+- Implement only the requested scope. New dependencies require explicit approval.
+- Ask before consequential product, architecture, security, or workflow assumptions — use direct questions, don't guess.
+- **Do not trust internal knowledge for fast-moving libraries** (LLM SDKs, agent frameworks, new APIs). Read the installed package docs, `node_modules/<pkg>/docs/`, or the official reference before writing integration code.
+- Do not kill or restart the owner's running dev servers or long-lived processes without asking.
+- **No destructive commands without explicit approval:** `rm -rf`, dropping or truncating database tables, deleting cloud resources, overwriting files you did not create, bulk renames/moves. Before deleting or overwriting anything, look at the target — if it doesn't match what you expected, stop and surface it.
+- Protected paths: <list any read-only, source-of-truth directories — e.g. golden datasets, generated clients, vendored docs>. Never modify them without explicit approval; never hand-edit generated files — regenerate them.
+- When adding a hard-won rule to this file, state the one-line **Why** first, then the normative rule. Example: *"Incident: schema drift broke batch inserts because production missed a check constraint. Rule: schema changes must ship with a migration and a health-check path."*
 
 ## Decision log
 
-- **D001** — 2026-07-09 — Single Next.js app, in-memory state, no DB. Rejected: separate backend (integration overhead in 7h).
-- **D002** — 2026-07-09 — Draft generation gated behind `go` state; no send path anywhere in the codebase. Product constraint, see PRODUCT.md.
-- **D003** — 2026-07-09 — `data/` book = real companies with real recent trackable events; only CRM history is fabricated. Frozen after 11:00.
-- **D004** — 2026-07-09 — Pivot rule: if competitor-activity signals are weak by 10:30, trigger becomes champion job change. Architecture unchanged.
-- **D005** — 2026-07-09 — Similarity = Claude-judged with cited reasons, precomputed for the whole book, cached in `data/similarity.json`. Rejected: embeddings.
-- **D006** — 2026-07-09 — 2D canvas force layout, clustered-grid fallback. Rejected: Three.js.
-- **D007** — 2026-07-09 — `DEMO_MODE=live|replay` with auto-recording of live calls to fixtures.
+Record durable decisions here, numbered, newest last. Later entries may supersede earlier ones (say so: "Supersedes D00X"). Decisions are challengeable before implementation — settled after.
+
+- **D001** — <date> — <decision, one line of why, rejected alternative>.
 
 ## External services
 
 | Service | Purpose | Env vars |
 |---|---|---|
-| Anthropic API | All four agents | `ANTHROPIC_API_KEY` |
-| Sillage MCP | Signals, power map, slot management | `SILLAGE_MCP_URL`, `SILLAGE_API_KEY` |
-| FullEnrich MCP | Waterfall contact verification | `FULLENRICH_MCP_URL`, `FULLENRICH_API_KEY` |
+| <LLM provider> | <what it's used for> | `<API_KEY_NAME>` |
+| <storage / DB> | <...> | `<...>` |
 
-Keep `.env.example` in sync with every variable read. Never commit real keys.
+Keep a committed `.env.example` in sync with every variable the app reads. Never commit `.env.local` or real keys.
 
-## Hackathon engineering mode
+---
 
-- **Riskiest integration first**: the contagion loop end-to-end on real Sillage data, ugly, before any UI polish.
-- **Vertical slice over completeness**: one scenario, flawless. Cut scope, never the demo path.
-- Hardcoded fixture fallback for every external dependency: networks fail on stage.
-- What never relaxes: typecheck passes, boundaries parse, no secrets or PII in code/logs, this file stays current when the plan changes.
+## Hackathon mode
+
+<!-- Keep this section for hackathons/demos; delete it for long-lived projects. -->
+
+Time-boxed build (~<X> hours). The demo path **is** the product. Rules above still apply unless explicitly relaxed here.
+
+**What changes:**
+
+- **Build the riskiest integration first.** Prove the load-bearing capability (the one the demo cannot work without) end-to-end within the first hours, ugly. Everything else layers on top of a working spine.
+- **Vertical slice over horizontal completeness.** One scenario, demoed flawlessly, beats five half-working features. Cut scope, not the demo path.
+- Stop-before-commit relaxes to: commit early and often to `main` or short-lived branches; keep every commit runnable so you can roll back live.
+- Testing focuses on the demo path: one smoke test / script that exercises the full flow beats a unit-test suite. Re-run it after every change — a broken demo found at minute 5 is fixable; at minute 55 it is not.
+- A hardcoded fallback for every external dependency in the demo (canned API response, recorded audio, seeded state) — networks fail on stage.
+
+**What never relaxes:**
+
+- No secrets in client code or committed files.
+- Typecheck must pass — type errors cost more time than they save under pressure.
+- Parse LLM/external output before acting on it — a demo that crashes on a malformed response is a failed demo.
+- The step-back checklist — especially "has this already been built?" (SDK quickstarts and official examples exist; use them).
+- Update this file when the plan changes, so every teammate's agent stays aligned.
+
+**Demo checklist (fill in during the event):**
+
+- [ ] Load-bearing capability proven end-to-end
+- [ ] Second capability fires *because* the first is running (not bolted on)
+- [ ] Full demo run-through from a clean state, twice
+- [ ] Fallbacks tested (kill the network, replay the canned path)
+- [ ] Pitch states the one thing the task can't work without
