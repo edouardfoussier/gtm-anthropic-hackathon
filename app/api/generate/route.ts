@@ -68,18 +68,23 @@ export async function POST(req: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "missing prospectId" }, { status: 400 });
   }
 
+  const presenter = parsePresenter(record.presenter);
+  const voiceByPresenter: Record<Presenter, string> = {
+    tom: process.env.GRADIUM_VOICE_ID ?? "",
+    edouard: process.env.EDOUARD_VOICE_ID ?? "",
+    mathis: process.env.MATHIS_VOICE_ID ?? "",
+  };
+  const voiceId = voiceByPresenter[presenter] || (process.env.GRADIUM_VOICE_ID ?? "");
+
   // Remote engine (e.g. a GCE VM running server/index.ts): the video pipeline
   // needs ffmpeg + a writable filesystem, which serverless/Workers cannot offer.
-  // When ENGINE_API_URL is set, delegate generation to that host and relay its ack.
-  // TODO: remote jobs are polled at `${ENGINE_API_URL}/jobs/{jobId}` and the video
-  //       is served from `${ENGINE_API_URL}/videos/{id}.mp4` — the client poller
-  //       must target the remote host, not the local job file, in this mode.
-  const engineApiUrl = process.env.ENGINE_API_URL?.trim();
+  // When ENGINE_API_URL is set, delegate generation to that host and relay its ack;
+  // the reach-out flow then polls GET /api/generate/[jobId], which proxies to the
+  // same host, and the video is served from ${ENGINE_API_URL}/videos/{id}.mp4.
+  const engineApiUrl = process.env.ENGINE_API_URL?.trim().replace(/\/+$/, "");
   if (engineApiUrl) {
-    return forwardToEngine(engineApiUrl, record);
+    return forwardToEngine(engineApiUrl, { prospectId, voiceId });
   }
-
-  const presenter = parsePresenter(record.presenter);
 
   const jobId = `${prospectId}-${Date.now().toString(36)}`;
   await writeJob({
@@ -90,12 +95,6 @@ export async function POST(req: Request): Promise<NextResponse> {
     createdAt: new Date().toISOString(),
   });
 
-  const voiceByPresenter: Record<Presenter, string> = {
-    tom: process.env.GRADIUM_VOICE_ID ?? "",
-    edouard: process.env.EDOUARD_VOICE_ID ?? "",
-    mathis: process.env.MATHIS_VOICE_ID ?? "",
-  };
-
   const child = spawn("npx", ["tsx", "engine/src/cli.ts", prospectId], {
     cwd: process.cwd(),
     detached: true,
@@ -103,7 +102,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     env: {
       ...process.env,
       JOB_FILE: jobPath(jobId),
-      GRADIUM_VOICE_ID: voiceByPresenter[presenter] || (process.env.GRADIUM_VOICE_ID ?? ""),
+      GRADIUM_VOICE_ID: voiceId,
       FAL_KEY: "",
       AUTODECK_PRESENTER: "",
     },

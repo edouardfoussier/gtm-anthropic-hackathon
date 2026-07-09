@@ -75,6 +75,9 @@ export async function getProspect(id: string): Promise<Prospect | null> {
   const records = JSON.parse(raw) as JuryRecord[];
   const rec = records.find((r) => r.id === id);
   if (!rec) return null;
+  // When a remote engine renders + hosts the videos, load them from it; otherwise
+  // they're served from the app's own public/videos.
+  const engineBase = process.env.ENGINE_API_URL?.trim().replace(/\/+$/, "") ?? "";
   return {
     id: rec.id,
     firstName: rec.firstName,
@@ -82,8 +85,8 @@ export async function getProspect(id: string): Promise<Prospect | null> {
     company: rec.company,
     title: rec.title ?? "",
     phone: rec.phone ?? "",
-    videoUrl: `/videos/${rec.id}.mp4`,
-    posterUrl: `/videos/${rec.id}.jpg`,
+    videoUrl: `${engineBase}/videos/${rec.id}.mp4`,
+    posterUrl: `${engineBase}/videos/${rec.id}.jpg`,
     sender: SENDER,
   };
 }

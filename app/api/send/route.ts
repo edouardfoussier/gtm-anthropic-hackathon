@@ -42,7 +42,10 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   const appUrl = process.env.APP_URL ?? DEFAULT_APP_URL;
   const shareUrl = `${appUrl}/v/${prospect.id}`;
-  const posterUrl = `${appUrl}${prospect.posterUrl}`;
+  // posterUrl is already absolute when served from a remote engine host.
+  const posterUrl = prospect.posterUrl.startsWith("http")
+    ? prospect.posterUrl
+    : `${appUrl}${prospect.posterUrl}`;
   const to = body.to ?? defaultRecipient();
 
   const result = await sendPitchEmail({
