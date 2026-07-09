@@ -29,7 +29,7 @@ export default async function SharePage({
   const prospect = await getProspect(id);
   if (!prospect) notFound();
 
-  const { firstName, company, title, videoUrl, posterUrl, sender } = prospect;
+  const { firstName, company, title, videoUrl, posterUrl, sender, phone } = prospect;
 
   return (
     <PageShell className="flex flex-1 flex-col">
@@ -75,7 +75,7 @@ export default async function SharePage({
             <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               02 — Want to talk?
             </span>
-            <CallbackForm prospectId={id} senderName={sender.name} />
+            <CallbackForm prospectId={id} senderName={sender.name} defaultPhone={phone} />
           </MinimalCard>
         </div>
       </main>

@@ -11,8 +11,44 @@ import { jobPath, writeJob } from "@/lib/jobs";
  */
 type Presenter = "tom" | "edouard" | "mathis";
 
+/** Give up on the remote engine's fast 202 ack after this — it must not hang the route. */
+const REMOTE_ACK_TIMEOUT_MS = 10_000;
+
 function parsePresenter(value: unknown): Presenter {
   return value === "edouard" || value === "mathis" ? value : "tom";
+}
+
+/** Forward the generation request to a remote engine host and relay its `{ jobId }` ack. */
+async function forwardToEngine(
+  engineApiUrl: string,
+  body: Record<string, unknown>,
+): Promise<NextResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REMOTE_ACK_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(`${engineApiUrl}/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!upstream.ok) {
+      return NextResponse.json({ error: "engine error" }, { status: 502 });
+    }
+    const data: unknown = await upstream.json();
+    const jobId =
+      typeof data === "object" && data !== null && typeof (data as Record<string, unknown>).jobId === "string"
+        ? ((data as Record<string, unknown>).jobId as string)
+        : "";
+    if (!jobId) {
+      return NextResponse.json({ error: "engine error" }, { status: 502 });
+    }
+    return NextResponse.json({ jobId });
+  } catch {
+    return NextResponse.json({ error: "engine unreachable" }, { status: 504 });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -31,7 +67,24 @@ export async function POST(req: Request): Promise<NextResponse> {
   if (!prospectId) {
     return NextResponse.json({ error: "missing prospectId" }, { status: 400 });
   }
+
   const presenter = parsePresenter(record.presenter);
+  const voiceByPresenter: Record<Presenter, string> = {
+    tom: process.env.GRADIUM_VOICE_ID ?? "",
+    edouard: process.env.EDOUARD_VOICE_ID ?? "",
+    mathis: process.env.MATHIS_VOICE_ID ?? "",
+  };
+  const voiceId = voiceByPresenter[presenter] || (process.env.GRADIUM_VOICE_ID ?? "");
+
+  // Remote engine (e.g. a GCE VM running server/index.ts): the video pipeline
+  // needs ffmpeg + a writable filesystem, which serverless/Workers cannot offer.
+  // When ENGINE_API_URL is set, delegate generation to that host and relay its ack;
+  // the reach-out flow then polls GET /api/generate/[jobId], which proxies to the
+  // same host, and the video is served from ${ENGINE_API_URL}/videos/{id}.mp4.
+  const engineApiUrl = process.env.ENGINE_API_URL?.trim().replace(/\/+$/, "");
+  if (engineApiUrl) {
+    return forwardToEngine(engineApiUrl, { prospectId, voiceId });
+  }
 
   const jobId = `${prospectId}-${Date.now().toString(36)}`;
   await writeJob({
@@ -42,12 +95,6 @@ export async function POST(req: Request): Promise<NextResponse> {
     createdAt: new Date().toISOString(),
   });
 
-  const voiceByPresenter: Record<Presenter, string> = {
-    tom: process.env.GRADIUM_VOICE_ID ?? "",
-    edouard: process.env.EDOUARD_VOICE_ID ?? "",
-    mathis: process.env.MATHIS_VOICE_ID ?? "",
-  };
-
   const child = spawn("npx", ["tsx", "engine/src/cli.ts", prospectId], {
     cwd: process.cwd(),
     detached: true,
@@ -55,7 +102,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     env: {
       ...process.env,
       JOB_FILE: jobPath(jobId),
-      GRADIUM_VOICE_ID: voiceByPresenter[presenter] || (process.env.GRADIUM_VOICE_ID ?? ""),
+      GRADIUM_VOICE_ID: voiceId,
       FAL_KEY: "",
       AUTODECK_PRESENTER: "",
     },

@@ -1,0 +1,5 @@
+{
+  "name": "autodeck-server",
+  "private": true,
+  "type": "module"
+}

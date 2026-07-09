@@ -25,7 +25,8 @@ async function triggerOutboundCall(phone: string, prospectId: string): Promise<C
       body: JSON.stringify({
         to: phone,
         name: prospect?.firstName ?? undefined,
-        context: `${prospect?.firstName ?? "A prospect"} at ${prospect?.company ?? "their company"} just watched the AutoDeck video and asked to be called back now.`,
+        objective: `Call ${prospect?.firstName ?? "the prospect"} from ${prospect?.company ?? "their company"}. Simply ask what they think of AutoDeck and whether they have any question for the founders. Keep it short, warm, and conversational.`,
+        context: `${prospect?.firstName ?? "A prospect"} at ${prospect?.company ?? "their company"} just watched the AutoDeck pitch video and asked to be called back now.`,
       }),
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     });
