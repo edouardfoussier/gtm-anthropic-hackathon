@@ -75,7 +75,7 @@ export default function Home() {
       <div className="flex flex-1">
         <div className="flex flex-1 flex-col">
           <PageShell className="flex flex-1 flex-col">
-            <header className="relative z-30 flex items-center justify-between">
+            <header className="relative z-50 flex items-center justify-between">
               <span className="font-display text-xl uppercase tracking-tight">
                 GetAutoDeck
               </span>
@@ -144,7 +144,7 @@ export default function Home() {
           </PageShell>
         </div>
 
-        {expanded ? <QueueSidebar /> : null}
+        <QueueSidebar />
       </div>
 
       {prospect ? (
