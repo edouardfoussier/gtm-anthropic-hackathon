@@ -41,7 +41,7 @@ export function AppNav({
         ) : null}
       </div>
 
-      <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-6 text-xs font-medium uppercase tracking-[0.2em]">
+      <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-10 text-xs font-medium uppercase tracking-[0.2em]">
         {LINKS.map((link) => {
           const active =
             link.href === "/"

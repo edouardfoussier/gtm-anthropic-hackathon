@@ -17,7 +17,7 @@ import type { Prospect } from "@/lib/types";
 
 function HomeInner() {
   const router = useRouter();
-  const { enqueue } = useQueue();
+  const { enqueue, items } = useQueue();
   const [companyInput, setCompanyInput] = useState("");
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [frames, setFrames] = useState<DemoFrame[] | null>(null);
@@ -68,12 +68,6 @@ function HomeInner() {
     setFrames(run.frames);
     setCursor(0);
     setAutoPlaying(true);
-  }
-
-  function handleStep() {
-    if (!frames) return;
-    setAutoPlaying(false);
-    setCursor((c) => Math.min(c + 1, frames.length));
   }
 
   function handleReplay() {
@@ -211,8 +205,13 @@ function HomeInner() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleStep}
-                  disabled={!!frames && cursor >= frames.length}
+                  onClick={() => router.push("/targets")}
+                  disabled={items.length === 0}
+                  title={
+                    items.length === 0
+                      ? "Queue at least one contact to continue"
+                      : "Go to Targets"
+                  }
                   className="inline-flex items-center gap-2 border border-b-[3px] border-border border-b-foreground/40 bg-background px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] shadow-[0_2px_0_0_var(--border)] transition-all hover:text-accent-orange active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next

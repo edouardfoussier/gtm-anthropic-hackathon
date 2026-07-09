@@ -12,10 +12,12 @@ import type { PeopleGraphProps, PersonNode, PersonStatus, Seniority } from "./ty
 
 export type { PersonNode } from "./types";
 
-const IDLE_ROTATION_SPEED = 0.0006;
+const IDLE_ROTATION_SPEED = 0.0011;
 const CONVERGE_SECONDS = 0.9;
 const CAMERA_IDLE_Z = 6;
+const CAMERA_MIN_Z = 2.5;
 const CAMERA_MAX_Z = 18;
+const ZOOM_SPEED = 0.0015;
 const FLOW_DOTS = 5;
 const LEVEL_1_DIST = 3.0;
 const LEVEL_2_DIST = 2.1;
@@ -29,10 +31,10 @@ const TIER: Record<
   Seniority,
   { radius: number; dots: number; size: number; labelPad: number }
 > = {
-  1: { radius: 0.44, dots: 130, size: 5.0, labelPad: 30 },
-  2: { radius: 0.34, dots: 105, size: 4.7, labelPad: 25 },
-  3: { radius: 0.26, dots: 82, size: 4.4, labelPad: 21 },
-  4: { radius: 0.2, dots: 62, size: 4.0, labelPad: 19 },
+  1: { radius: 0.44, dots: 150, size: 7.0, labelPad: 30 },
+  2: { radius: 0.34, dots: 120, size: 6.6, labelPad: 25 },
+  3: { radius: 0.26, dots: 95, size: 6.2, labelPad: 21 },
+  4: { radius: 0.2, dots: 72, size: 5.6, labelPad: 19 },
 };
 
 // Base color stays ink even when picked — the orange arrives via the uAccent
@@ -63,6 +65,7 @@ const CLUSTER_VERTEX = /* glsl */ `
   uniform float uProgress;
   uniform float uPulse;
   uniform float uSize;
+  uniform float uTime;
   attribute vec3 aStart;
   attribute float aStagger;
   varying float vAlpha;
@@ -77,6 +80,13 @@ const CLUSTER_VERTEX = /* glsl */ `
     float p = clamp((uProgress - aStagger * 0.3) / 0.7, 0.0, 1.0);
     float e = easeOutBack(p);
     vec3 pos = mix(aStart, position, e);
+    // Subtle per-particle drift once converged, so the sphere feels alive.
+    float ph = aStagger * 6.2831853;
+    pos += p * 0.02 * vec3(
+      sin(uTime * 1.6 + ph),
+      cos(uTime * 1.4 + ph * 1.7),
+      sin(uTime * 1.9 + ph * 0.6)
+    );
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_PointSize = uSize * (6.0 / -mvPosition.z) * (0.6 + 0.4 * p) * (1.0 + uPulse * 0.25);
     gl_Position = projectionMatrix * mvPosition;
@@ -453,6 +463,7 @@ export function PeopleGraph({
           uProgress: { value: 0 },
           uPulse: { value: 0 },
           uSize: { value: tier.size },
+          uTime: { value: 0 },
           uColor: { value: INK.clone() },
           uAccentColor: { value: ORANGE.clone() },
           uAccent: { value: 0 },
@@ -629,10 +640,19 @@ export function PeopleGraph({
         mount.releasePointerCapture(e.pointerId);
       mount.style.cursor = "grab";
     }
+    // Wheel zoom: an additive offset on top of the auto-dolly fit distance,
+    // clamped so the constellation can't be pushed inside-out or lost.
+    let zoomOffset = 0;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      zoomOffset += e.deltaY * ZOOM_SPEED;
+      zoomOffset = Math.max(-3.2, Math.min(6, zoomOffset));
+    }
     mount.style.cursor = "grab";
     mount.addEventListener("pointerdown", onPointerDown);
     mount.addEventListener("pointermove", onPointerMove);
     mount.addEventListener("pointerup", onPointerUp);
+    mount.addEventListener("wheel", onWheel, { passive: false });
 
     function animate(timestamp: number) {
       animationFrame = requestAnimationFrame(animate);
@@ -689,10 +709,15 @@ export function PeopleGraph({
       }
       const needZ =
         Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.15 + 1.0;
-      const cameraTarget =
+      const fitZ =
         visuals.size > 0
           ? Math.min(Math.max(needZ, CAMERA_IDLE_Z), CAMERA_MAX_Z)
           : CAMERA_IDLE_Z;
+      // User wheel zoom rides on top of the auto-fit distance.
+      const cameraTarget = Math.max(
+        CAMERA_MIN_Z,
+        Math.min(CAMERA_MAX_Z, fitZ + zoomOffset),
+      );
       camera.position.z +=
         (cameraTarget - camera.position.z) * (1 - Math.exp(-dt * 2.2));
 
@@ -721,6 +746,7 @@ export function PeopleGraph({
         const uniforms = v.clusterMaterial.uniforms;
         uniforms.uProgress.value = v.progress;
         uniforms.uPulse.value = v.pulse;
+        uniforms.uTime.value = elapsed;
         uniforms.uOpacity.value = v.opacity;
         uniforms.uAccent.value = v.accent;
         (uniforms.uColor.value as THREE.Color).copy(v.color);
@@ -808,6 +834,7 @@ export function PeopleGraph({
       mount.removeEventListener("pointerdown", onPointerDown);
       mount.removeEventListener("pointermove", onPointerMove);
       mount.removeEventListener("pointerup", onPointerUp);
+      mount.removeEventListener("wheel", onWheel);
       for (const [id, v] of visuals) removePerson(id, v);
       dustGeometry.dispose();
       dustMaterial.dispose();
