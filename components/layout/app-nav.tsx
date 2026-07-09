@@ -18,10 +18,13 @@ const LINKS: { href: string; label: string }[] = [
 export function AppNav({
   children,
   context,
+  showTabs = true,
 }: {
   children?: React.ReactNode;
   /** Optional run context shown next to the brand, e.g. the targeted company. */
   context?: string;
+  /** Hide the Graph/Targets/Dashboard tabs (e.g. the bare landing globe). */
+  showTabs?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -41,28 +44,30 @@ export function AppNav({
         ) : null}
       </div>
 
-      <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-10 text-xs font-medium uppercase tracking-[0.2em]">
-        {LINKS.map((link) => {
-          const active =
-            link.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(link.href);
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "transition-colors",
-                active
-                  ? "text-accent-orange"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {showTabs ? (
+        <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-10 text-xs font-medium uppercase tracking-[0.2em]">
+          {LINKS.map((link) => {
+            const active =
+              link.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "transition-colors",
+                  active
+                    ? "text-accent-orange"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
 
       <div className="flex items-center gap-4">{children}</div>
     </header>
