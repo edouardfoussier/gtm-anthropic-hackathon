@@ -17,6 +17,8 @@ export interface Prospect {
   lastName: string;
   company: string;
   title: string;
+  /** From FullEnrich when available; empty string means "let the prospect fill it". */
+  phone: string;
   videoUrl: string;
   posterUrl: string;
   sender: Sender;
@@ -37,6 +39,8 @@ interface JuryRecord {
   lastName: string;
   company: string;
   title?: string;
+  phone?: string;
+  linkedin?: string;
 }
 
 export interface ProspectSummary {
@@ -77,6 +81,7 @@ export async function getProspect(id: string): Promise<Prospect | null> {
     lastName: rec.lastName,
     company: rec.company,
     title: rec.title ?? "",
+    phone: rec.phone ?? "",
     videoUrl: `/videos/${rec.id}.mp4`,
     posterUrl: `/videos/${rec.id}.jpg`,
     sender: SENDER,

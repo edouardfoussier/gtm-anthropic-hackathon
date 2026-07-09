@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, Circle, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowRight, Check, Circle, ExternalLink, Loader2, Mail } from "lucide-react";
 import { MinimalCard } from "@/components/ui/minimal-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -458,6 +458,8 @@ function ScriptEditor({
   );
 }
 
+type SendState = "idle" | "sending" | "sent" | "error";
+
 function ResultCard({
   videoUrl,
   prospectId,
@@ -465,13 +467,48 @@ function ResultCard({
   videoUrl: string;
   prospectId: string;
 }) {
+  const [sendState, setSendState] = useState<SendState>("idle");
+
+  async function handleSend(): Promise<void> {
+    setSendState("sending");
+    try {
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prospectId }),
+      });
+      if (!res.ok) throw new Error(`send failed (${res.status})`);
+      setSendState("sent");
+    } catch {
+      setSendState("error");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <span className="text-xs font-medium uppercase tracking-[0.2em] text-accent-orange">
         03 — Ready to send
       </span>
       <video src={videoUrl} controls className="aspect-video w-full border border-border" />
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleSend}
+          disabled={sendState === "sending" || sendState === "sent"}
+        >
+          {sendState === "sending" ? (
+            <Loader2 className="animate-spin" />
+          ) : sendState === "sent" ? (
+            <Check className="text-accent-orange" />
+          ) : (
+            <Mail />
+          )}
+          {sendState === "idle" && "Send email"}
+          {sendState === "sending" && "Sending…"}
+          {sendState === "sent" && "Email sent"}
+          {sendState === "error" && "Retry send"}
+        </Button>
         <a
           href={`/v/${prospectId}`}
           className="inline-flex items-center gap-2 text-sm text-accent-orange underline-offset-4 hover:underline"
@@ -479,10 +516,12 @@ function ResultCard({
           Open share page
           <ExternalLink className="size-4" />
         </a>
-        <span className="text-xs text-muted-foreground">
-          your own visits don&apos;t count in analytics
-        </span>
       </div>
+      <span className="text-xs text-muted-foreground">
+        {sendState === "error"
+          ? "Something went wrong sending the email — try again."
+          : "your own visits don’t count in analytics"}
+      </span>
     </div>
   );
 }

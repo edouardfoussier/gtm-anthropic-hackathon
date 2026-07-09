@@ -37,9 +37,27 @@ export function VideoPlayer({
   const [muted, setMuted] = useState(true);
 
   useEffect(() => {
-    ref.current?.play().catch(() => {
-      /* some browsers block even muted autoplay until interaction */
-    });
+    const v = ref.current;
+    if (!v) return;
+    const events = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    const unmute = (): void => {
+      v.muted = false;
+      setMuted(false);
+      v.play().catch(() => {});
+      events.forEach((e) => window.removeEventListener(e, unmute));
+    };
+    // Try sound-on autoplay; browsers usually block it, so fall back to muted
+    // autoplay and unmute on the viewer's very first interaction anywhere.
+    v.muted = false;
+    v.play()
+      .then(() => setMuted(false))
+      .catch(() => {
+        v.muted = true;
+        setMuted(true);
+        v.play().catch(() => {});
+        events.forEach((e) => window.addEventListener(e, unmute, { passive: true }));
+      });
+    return () => events.forEach((e) => window.removeEventListener(e, unmute));
   }, []);
 
   function handleTimeUpdate(): void {
@@ -66,7 +84,7 @@ export function VideoPlayer({
         src={src}
         poster={poster}
         autoPlay
-        muted
+        muted={muted}
         playsInline
         controls
         onPlay={() => track(prospectId, "play", ref.current?.currentTime ?? 0)}

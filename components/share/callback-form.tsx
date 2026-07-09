@@ -14,12 +14,14 @@ type Status = "idle" | "sending" | "done" | "error";
 export function CallbackForm({
   prospectId,
   senderName,
+  defaultPhone = "",
 }: {
   prospectId: string;
   senderName: string;
+  defaultPhone?: string;
 }) {
   const [when, setWhen] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(defaultPhone);
   const [status, setStatus] = useState<Status>("idle");
 
   async function submit(e: React.FormEvent): Promise<void> {
