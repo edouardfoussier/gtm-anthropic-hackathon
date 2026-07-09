@@ -13,6 +13,13 @@ function viewerHash(ip: string, ua: string): string {
   return createHash("sha256").update(`${SALT}:${ip}:${ua}`).digest("hex").slice(0, 16);
 }
 
+/** Internal traffic (our own dashboard/preview) carries autodeck_internal=1 so
+ * our visits never inflate a prospect's view analytics. */
+function isInternal(cookieHeader: string | null): boolean {
+  if (!cookieHeader) return false;
+  return cookieHeader.split(";").some((c) => c.trim() === "autodeck_internal=1");
+}
+
 export async function POST(req: Request): Promise<NextResponse> {
   let body: { id?: string; event?: string; currentTime?: number };
   try {
@@ -22,6 +29,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
   if (!body.id || !body.event) {
     return NextResponse.json({ ok: false, error: "missing id/event" }, { status: 400 });
+  }
+
+  if (isInternal(req.headers.get("cookie"))) {
+    return NextResponse.json({ ok: true, skipped: true });
   }
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";

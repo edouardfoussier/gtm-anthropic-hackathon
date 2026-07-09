@@ -30,7 +30,10 @@ export default function Home() {
           </h1>
         </div>
 
-        <form className="flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 pb-3">
+        <form
+          action="/login"
+          className="flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 pb-3"
+        >
           <input
             type="text"
             placeholder="Target a company…"

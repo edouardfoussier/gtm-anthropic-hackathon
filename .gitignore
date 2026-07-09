@@ -54,5 +54,6 @@ next-env.d.ts
 /engine/.cache/
 screencapture-*.png
 
-# runtime event logs (view tracking, callback requests)
+# runtime event logs (view tracking, callback requests) + generation jobs
 /data/events/
+/data/jobs/
