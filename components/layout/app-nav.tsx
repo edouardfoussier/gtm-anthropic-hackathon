@@ -27,20 +27,20 @@ export function AppNav({
 
   return (
     <header className="relative z-50 flex items-center justify-between gap-6">
-      <div className="flex items-center gap-8">
-        <span className="flex items-baseline gap-3">
+      <div className="flex items-center gap-10">
+        <div className="flex flex-col">
           <Link
             href="/"
-            className="font-display text-xl uppercase tracking-tight"
+            className="font-display text-3xl uppercase leading-none tracking-tight md:text-4xl"
           >
             AutoDeck
           </Link>
           {context ? (
-            <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              / {context}
+            <span className="mt-1 text-sm font-medium uppercase tracking-[0.2em] text-accent-orange">
+              {context}
             </span>
           ) : null}
-        </span>
+        </div>
         <nav className="flex items-center gap-5 text-xs font-medium uppercase tracking-[0.2em]">
           {LINKS.map((link) => {
             const active =

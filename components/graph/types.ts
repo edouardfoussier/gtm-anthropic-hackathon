@@ -18,6 +18,10 @@ export interface PersonNode {
   reportsTo?: string;
   /** Shown under the title once known (e.g. enriched email · phone). */
   sublabel?: string;
+  /** Personal data surfaced on hover. */
+  email?: string;
+  phone?: string;
+  linkedin?: string;
 }
 
 export interface PeopleGraphProps {

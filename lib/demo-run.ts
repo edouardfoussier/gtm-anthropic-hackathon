@@ -130,6 +130,9 @@ export function buildDemoRun(
       seniority: seed.seniority,
       reportsTo: seed.reportsTo ? `${id}-${seed.reportsTo}` : undefined,
       sublabel,
+      email: contact?.email || undefined,
+      phone: contact?.phone || undefined,
+      linkedin: contact?.linkedin || undefined,
     };
   }
 

@@ -202,8 +202,8 @@ export function PeopleGraph({
   }, [onPersonClick]);
 
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return;
+    if (!mountRef.current) return;
+    const mount: HTMLDivElement = mountRef.current;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -224,6 +224,35 @@ export function PeopleGraph({
     const labelLayer = document.createElement("div");
     labelLayer.className = "pointer-events-none absolute inset-0";
     mount.appendChild(labelLayer);
+
+    // Hover card: personal data for the person under the cursor. Positioned
+    // manually near the label; only one shows at a time.
+    const tooltip = document.createElement("div");
+    tooltip.className =
+      "pointer-events-none absolute z-20 hidden min-w-52 -translate-x-1/2 border border-border bg-background/95 p-3 text-left shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] backdrop-blur-sm";
+    labelLayer.appendChild(tooltip);
+
+    function showTooltip(node: PersonNode, x: number, y: number) {
+      const rows: string[] = [];
+      if (node.title) rows.push(node.title);
+      if (node.email) rows.push(node.email);
+      if (node.phone) rows.push(node.phone);
+      if (node.linkedin) rows.push(node.linkedin);
+      tooltip.innerHTML =
+        `<div class="font-display text-sm uppercase tracking-tight">${node.name}</div>` +
+        rows
+          .map(
+            (r) =>
+              `<div class="mt-0.5 text-[11px] text-muted-foreground">${r}</div>`,
+          )
+          .join("");
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y + 18}px`;
+      tooltip.classList.remove("hidden");
+    }
+    function hideTooltip() {
+      tooltip.classList.add("hidden");
+    }
 
     // One world group: every cluster + link rotates together.
     const world = new THREE.Group();
@@ -278,6 +307,14 @@ export function PeopleGraph({
       labelEl.addEventListener("click", () => {
         onPersonClickRef.current?.(personId);
       });
+      labelEl.addEventListener("mouseenter", () => {
+        const v = visuals.get(personId);
+        if (!v) return;
+        const left = parseFloat(v.labelEl.style.left) || 0;
+        const top = parseFloat(v.labelEl.style.top) || 0;
+        showTooltip(v.node, left, top);
+      });
+      labelEl.addEventListener("mouseleave", hideTooltip);
       const nameEl = document.createElement("div");
       nameEl.className = "text-[11px] font-medium tracking-tight";
       nameEl.style.transition = "color 700ms";
@@ -538,6 +575,46 @@ export function PeopleGraph({
     const worldPos = new THREE.Vector3();
     const ndc = new THREE.Vector3();
 
+    // Drag-to-rotate: user drag overrides the idle spin; a short grace period
+    // after release keeps the manual angle, then the gentle auto-spin resumes.
+    const DRAG_SPEED = 0.008;
+    const RESUME_DELAY_MS = 2500;
+    let dragging = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let manualYaw = 0;
+    let manualPitch = 0;
+    let userControlled = false;
+    let lastInteraction = 0;
+
+    function onPointerDown(e: PointerEvent) {
+      dragging = true;
+      userControlled = true;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+      mount.setPointerCapture(e.pointerId);
+      mount.style.cursor = "grabbing";
+    }
+    function onPointerMove(e: PointerEvent) {
+      if (!dragging) return;
+      manualYaw += (e.clientX - lastPointerX) * DRAG_SPEED;
+      manualPitch += (e.clientY - lastPointerY) * DRAG_SPEED;
+      manualPitch = Math.max(-1.2, Math.min(1.2, manualPitch));
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    }
+    function onPointerUp(e: PointerEvent) {
+      if (!dragging) return;
+      dragging = false;
+      lastInteraction = performance.now();
+      mount.releasePointerCapture(e.pointerId);
+      mount.style.cursor = "grab";
+    }
+    mount.style.cursor = "grab";
+    mount.addEventListener("pointerdown", onPointerDown);
+    mount.addEventListener("pointermove", onPointerMove);
+    mount.addEventListener("pointerup", onPointerUp);
+
     function animate(timestamp: number) {
       animationFrame = requestAnimationFrame(animate);
       timer.update(timestamp);
@@ -558,10 +635,22 @@ export function PeopleGraph({
       dustOpacity += (dustTarget - dustOpacity) * smoothing;
       dustMaterial.uniforms.uOpacity.value = dustOpacity;
 
-      // World rotation (slower while people are on screen so labels stay readable).
-      const rotationScale = visuals.size > 0 ? 0.45 : 1;
-      world.rotation.y += IDLE_ROTATION_SPEED * rotationScale * (dt * 60);
-      world.rotation.x = Math.sin(elapsed * 0.05) * 0.15;
+      // World rotation: drag-to-rotate takes over; auto-spin resumes after a
+      // grace period since the last interaction.
+      const sinceInteraction = performance.now() - lastInteraction;
+      if (!dragging && userControlled && sinceInteraction > RESUME_DELAY_MS) {
+        userControlled = false;
+      }
+      if (userControlled) {
+        world.rotation.y = manualYaw;
+        world.rotation.x = manualPitch;
+      } else {
+        const rotationScale = visuals.size > 0 ? 0.45 : 1;
+        manualYaw += IDLE_ROTATION_SPEED * rotationScale * (dt * 60);
+        manualPitch = Math.sin(elapsed * 0.05) * 0.15;
+        world.rotation.y = manualYaw;
+        world.rotation.x = manualPitch;
+      }
       world.updateMatrixWorld();
 
       // Camera dolly: fit height and width separately (wide screens can keep
@@ -685,7 +774,6 @@ export function PeopleGraph({
     animate(performance.now());
 
     function handleResize() {
-      if (!mount) return;
       camera.aspect = mount.clientWidth / mount.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
@@ -698,6 +786,9 @@ export function PeopleGraph({
     return () => {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
+      mount.removeEventListener("pointerdown", onPointerDown);
+      mount.removeEventListener("pointermove", onPointerMove);
+      mount.removeEventListener("pointerup", onPointerUp);
       for (const [id, v] of visuals) removePerson(id, v);
       dustGeometry.dispose();
       dustMaterial.dispose();
