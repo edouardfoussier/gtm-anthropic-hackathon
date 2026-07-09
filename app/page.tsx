@@ -1,51 +1,171 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { PageShell } from "@/components/layout/page-shell";
-import { DotSphere } from "@/components/graph/dot-sphere";
+import {
+  SignalGlobe,
+  type GraphLink,
+  type GraphNode,
+} from "@/components/graph/signal-globe";
 import { Button } from "@/components/ui/button";
+import { ContactDrawer } from "@/components/prospect/contact-drawer";
+import { QueueSidebar } from "@/components/queue/queue-sidebar";
+import { QueueProvider } from "@/components/queue/queue-context";
+import { buildMockProspect } from "@/lib/mock-prospect";
+import type { Prospect } from "@/lib/types";
+
+/** "Center" is a virtual anchor id: the company label pinned to the globe's center, not a projected node. */
+const CENTER_ANCHOR_ID = "__center__";
+
+function toGraphNodes(prospect: Prospect): GraphNode[] {
+  return prospect.contacts.map((contact) => {
+    const relationship = prospect.relationships.find(
+      (r) => r.contactId === contact.id,
+    );
+    return {
+      id: contact.id,
+      label: contact.name,
+      sublabel: contact.title,
+      kind: "contact",
+      relationshipKind: relationship?.kind,
+    };
+  });
+}
+
+function toGraphLinks(prospect: Prospect): GraphLink[] {
+  return prospect.relationships.map((relationship) => ({
+    id: `link-${relationship.id}`,
+    fromId: CENTER_ANCHOR_ID,
+    toId: relationship.contactId,
+    relationshipKind: relationship.kind,
+  }));
+}
 
 export default function Home() {
+  const [companyInput, setCompanyInput] = useState("");
+  const [prospect, setProspect] = useState<Prospect | null>(null);
+  const [activeContactId, setActiveContactId] = useState<string | null>(null);
+
+  const graphNodes = useMemo(
+    () => (prospect ? toGraphNodes(prospect) : []),
+    [prospect],
+  );
+  const graphLinks = useMemo(
+    () => (prospect ? toGraphLinks(prospect) : []),
+    [prospect],
+  );
+
+  function handleSubmit(event: React.SubmitEvent) {
+    event.preventDefault();
+    if (!companyInput.trim()) return;
+    setProspect(buildMockProspect(companyInput.trim()));
+  }
+
+  function handleNodeClick(nodeId: string) {
+    setActiveContactId(nodeId);
+  }
+
+  const expanded = prospect !== null;
+
   return (
-    <PageShell className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between">
-        <span className="font-display text-xl uppercase tracking-tight">
-          AutoDeck
-        </span>
-        <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          GTM Autopilot
-        </span>
-      </header>
+    <QueueProvider>
+      <div className="flex flex-1">
+        <div className="flex flex-1 flex-col">
+          <PageShell className="flex flex-1 flex-col">
+            <header className="relative z-30 flex items-center justify-between">
+              <span className="font-display text-xl uppercase tracking-tight">
+                GetAutoDeck
+              </span>
+              <div className="flex items-center gap-4">
+                {expanded ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProspect(null);
+                      setCompanyInput("");
+                    }}
+                    className="border border-border bg-background/90 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground backdrop-blur-sm hover:text-foreground"
+                  >
+                    New search
+                  </button>
+                ) : null}
+                <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  GTM Autopilot
+                </span>
+              </div>
+            </header>
 
-      <main className="relative flex flex-1 flex-col items-center justify-center gap-10 py-16">
-        <div className="absolute inset-0 -z-10 flex items-center justify-center">
-          <DotSphere className="h-[560px] w-[560px] md:h-[720px] md:w-[720px]" />
+            <main className="relative flex flex-1 flex-col items-center justify-center gap-10 py-16">
+              <div
+                className={
+                  expanded
+                    ? "pointer-events-auto absolute inset-0 z-10 flex items-center justify-center transition-all duration-700"
+                    : "pointer-events-none absolute inset-0 -z-10 flex items-center justify-center transition-all duration-700"
+                }
+              >
+                <SignalGlobe
+                  expanded={expanded}
+                  companyName={prospect?.companyName}
+                  graphNodes={graphNodes}
+                  graphLinks={graphLinks}
+                  onNodeClick={handleNodeClick}
+                  className={
+                    expanded
+                      ? "h-[820px] w-[820px] transition-all duration-700 md:h-[980px] md:w-[980px]"
+                      : "h-[560px] w-[560px] transition-all duration-700 md:h-[720px] md:w-[720px]"
+                  }
+                />
+              </div>
+
+              {!expanded ? (
+                <>
+                  <div className="relative z-20 flex flex-col items-center gap-3 text-center">
+                    <span className="text-xs font-medium uppercase tracking-[0.2em] text-accent-orange">
+                      01 — Target
+                    </span>
+                    <h1 className="max-w-3xl text-5xl leading-[0.95] md:text-7xl">
+                      Type a company.
+                      <br />
+                      Watch the pipeline build itself.
+                    </h1>
+                  </div>
+
+                  <form
+                    onSubmit={handleSubmit}
+                    className="relative z-20 flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 bg-background/80 pb-3 backdrop-blur-sm"
+                  >
+                    <input
+                      type="text"
+                      value={companyInput}
+                      onChange={(event) => setCompanyInput(event.target.value)}
+                      placeholder="Target a company…"
+                      className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
+                    />
+                    <Button type="submit" size="lg">
+                      Find signal
+                    </Button>
+                  </form>
+                </>
+              ) : null}
+            </main>
+
+            <footer className="relative z-30 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              <span>Sillage · FullEnrich · Claude</span>
+              <span>Autopilot — off</span>
+            </footer>
+          </PageShell>
         </div>
 
-        <div className="flex flex-col items-center gap-3 text-center">
-          <span className="text-xs font-medium uppercase tracking-[0.2em] text-accent-orange">
-            01 — Target
-          </span>
-          <h1 className="max-w-3xl text-5xl leading-[0.95] md:text-7xl">
-            Type a company.
-            <br />
-            Watch the pipeline build itself.
-          </h1>
-        </div>
+        {expanded ? <QueueSidebar /> : null}
+      </div>
 
-        <form className="flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 pb-3">
-          <input
-            type="text"
-            placeholder="Target a company…"
-            className="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
-          />
-          <Button type="submit" size="lg">
-            Find signal
-          </Button>
-        </form>
-      </main>
-
-      <footer className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
-        <span>Sillage · FullEnrich · Claude</span>
-        <span>Autopilot — off</span>
-      </footer>
-    </PageShell>
+      {prospect ? (
+        <ContactDrawer
+          prospect={prospect}
+          contactId={activeContactId}
+          onClose={() => setActiveContactId(null)}
+        />
+      ) : null}
+    </QueueProvider>
   );
 }
