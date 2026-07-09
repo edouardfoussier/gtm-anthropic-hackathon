@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/components/layout/page-shell";
 import { AppNav } from "@/components/layout/app-nav";
@@ -17,7 +17,7 @@ import type { Prospect } from "@/lib/types";
 
 function HomeInner() {
   const router = useRouter();
-  const { enqueue } = useQueue();
+  const { enqueue, items } = useQueue();
   const [companyInput, setCompanyInput] = useState("");
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [frames, setFrames] = useState<DemoFrame[] | null>(null);
@@ -59,7 +59,7 @@ function HomeInner() {
     undefined,
   );
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = companyInput.trim();
     if (!name) return;
@@ -68,12 +68,6 @@ function HomeInner() {
     setFrames(run.frames);
     setCursor(0);
     setAutoPlaying(true);
-  }
-
-  function handleStep() {
-    if (!frames) return;
-    setAutoPlaying(false);
-    setCursor((c) => Math.min(c + 1, frames.length));
   }
 
   function handleReplay() {
@@ -141,19 +135,16 @@ function HomeInner() {
             {!expanded ? (
               <>
                 <div className="pointer-events-none relative z-20 flex flex-col items-center gap-3 text-center">
-                  <span className="text-xs font-medium uppercase tracking-[0.2em] text-accent-orange">
-                    01 — Target
-                  </span>
                   <h1 className="max-w-3xl text-5xl leading-[0.95] md:text-7xl">
                     Type a company.
                     <br />
-                    Watch the pipeline build itself.
+                    We&apos;ll pitch the right person.
                   </h1>
                 </div>
 
                 <form
                   onSubmit={handleSubmit}
-                  className="relative z-20 flex w-full max-w-xl items-center gap-2 border-b border-foreground/20 bg-background/80 pb-3 backdrop-blur-sm"
+                  className="group relative z-20 flex w-full max-w-xl items-center gap-3 rounded-xl border border-border border-b-[3px] border-b-foreground/40 bg-background px-5 py-4 shadow-[0_4px_0_0_var(--border),0_10px_24px_-12px_rgba(0,0,0,0.35)] transition-all focus-within:translate-y-0.5 focus-within:shadow-[0_2px_0_0_var(--border),0_6px_16px_-12px_rgba(0,0,0,0.35)]"
                 >
                   <input
                     type="text"
@@ -167,11 +158,7 @@ function HomeInner() {
                   </Button>
                 </form>
               </>
-            ) : (
-              <p className="pointer-events-none relative z-20 self-start text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Click a contact to queue their pitch
-              </p>
-            )}
+            ) : null}
 
             {logs.length > 0 ? (
               <div className="absolute bottom-2 left-0 z-10 flex w-full max-w-sm flex-col gap-1.5">
@@ -208,20 +195,27 @@ function HomeInner() {
             ) : null}
 
             {expanded ? (
-              <div className="absolute bottom-2 right-0 z-10 flex gap-5 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                <button
-                  type="button"
-                  onClick={handleStep}
-                  className="transition-colors hover:text-accent-orange"
-                >
-                  Step
-                </button>
+              <div className="absolute bottom-2 right-0 z-10 flex items-center gap-4">
                 <button
                   type="button"
                   onClick={handleReplay}
-                  className="transition-colors hover:text-accent-orange"
+                  className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-accent-orange"
                 >
                   Replay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/targets")}
+                  disabled={items.length === 0}
+                  title={
+                    items.length === 0
+                      ? "Queue at least one contact to continue"
+                      : "Go to Targets"
+                  }
+                  className="inline-flex items-center gap-2 border border-b-[3px] border-border border-b-foreground/40 bg-background px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] shadow-[0_2px_0_0_var(--border)] transition-all hover:text-accent-orange active:translate-y-0.5 active:shadow-none disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                  <span aria-hidden="true">→</span>
                 </button>
               </div>
             ) : null}
@@ -229,7 +223,6 @@ function HomeInner() {
 
           <footer className="relative z-30 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
             <span>Sillage · FullEnrich · Claude</span>
-            <span>Autopilot — off</span>
           </footer>
         </PageShell>
       </div>

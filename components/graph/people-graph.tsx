@@ -12,10 +12,12 @@ import type { PeopleGraphProps, PersonNode, PersonStatus, Seniority } from "./ty
 
 export type { PersonNode } from "./types";
 
-const IDLE_ROTATION_SPEED = 0.0006;
+const IDLE_ROTATION_SPEED = 0.0011;
 const CONVERGE_SECONDS = 0.9;
 const CAMERA_IDLE_Z = 6;
+const CAMERA_MIN_Z = 2.5;
 const CAMERA_MAX_Z = 18;
+const ZOOM_SPEED = 0.0015;
 const FLOW_DOTS = 5;
 const LEVEL_1_DIST = 3.0;
 const LEVEL_2_DIST = 2.1;
@@ -29,10 +31,10 @@ const TIER: Record<
   Seniority,
   { radius: number; dots: number; size: number; labelPad: number }
 > = {
-  1: { radius: 0.44, dots: 130, size: 5.0, labelPad: 30 },
-  2: { radius: 0.34, dots: 105, size: 4.7, labelPad: 25 },
-  3: { radius: 0.26, dots: 82, size: 4.4, labelPad: 21 },
-  4: { radius: 0.2, dots: 62, size: 4.0, labelPad: 19 },
+  1: { radius: 0.44, dots: 150, size: 7.0, labelPad: 30 },
+  2: { radius: 0.34, dots: 120, size: 6.6, labelPad: 25 },
+  3: { radius: 0.26, dots: 95, size: 6.2, labelPad: 21 },
+  4: { radius: 0.2, dots: 72, size: 5.6, labelPad: 19 },
 };
 
 // Base color stays ink even when picked — the orange arrives via the uAccent
@@ -63,6 +65,7 @@ const CLUSTER_VERTEX = /* glsl */ `
   uniform float uProgress;
   uniform float uPulse;
   uniform float uSize;
+  uniform float uTime;
   attribute vec3 aStart;
   attribute float aStagger;
   varying float vAlpha;
@@ -77,6 +80,13 @@ const CLUSTER_VERTEX = /* glsl */ `
     float p = clamp((uProgress - aStagger * 0.3) / 0.7, 0.0, 1.0);
     float e = easeOutBack(p);
     vec3 pos = mix(aStart, position, e);
+    // Subtle per-particle drift once converged, so the sphere feels alive.
+    float ph = aStagger * 6.2831853;
+    pos += p * 0.02 * vec3(
+      sin(uTime * 1.6 + ph),
+      cos(uTime * 1.4 + ph * 1.7),
+      sin(uTime * 1.9 + ph * 0.6)
+    );
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_PointSize = uSize * (6.0 / -mvPosition.z) * (0.6 + 0.4 * p) * (1.0 + uPulse * 0.25);
     gl_Position = projectionMatrix * mvPosition;
@@ -202,8 +212,8 @@ export function PeopleGraph({
   }, [onPersonClick]);
 
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return;
+    if (!mountRef.current) return;
+    const mount: HTMLDivElement = mountRef.current;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
@@ -224,6 +234,35 @@ export function PeopleGraph({
     const labelLayer = document.createElement("div");
     labelLayer.className = "pointer-events-none absolute inset-0";
     mount.appendChild(labelLayer);
+
+    // Hover card: personal data for the person under the cursor. Positioned
+    // manually near the label; only one shows at a time.
+    const tooltip = document.createElement("div");
+    tooltip.className =
+      "pointer-events-none absolute z-20 hidden min-w-52 -translate-x-1/2 border border-border bg-background/95 p-3 text-left shadow-[0_8px_24px_-12px_rgba(0,0,0,0.4)] backdrop-blur-sm";
+    labelLayer.appendChild(tooltip);
+
+    function showTooltip(node: PersonNode, x: number, y: number) {
+      const rows: string[] = [];
+      if (node.title) rows.push(node.title);
+      if (node.email) rows.push(node.email);
+      if (node.phone) rows.push(node.phone);
+      if (node.linkedin) rows.push(node.linkedin);
+      tooltip.innerHTML =
+        `<div class="font-display text-sm uppercase tracking-tight">${node.name}</div>` +
+        rows
+          .map(
+            (r) =>
+              `<div class="mt-0.5 text-[11px] text-muted-foreground">${r}</div>`,
+          )
+          .join("");
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y + 18}px`;
+      tooltip.classList.remove("hidden");
+    }
+    function hideTooltip() {
+      tooltip.classList.add("hidden");
+    }
 
     // One world group: every cluster + link rotates together.
     const world = new THREE.Group();
@@ -275,9 +314,18 @@ export function PeopleGraph({
       const labelEl = document.createElement("div");
       labelEl.className =
         "absolute -translate-x-1/2 whitespace-nowrap text-center pointer-events-auto cursor-pointer";
+      labelEl.dataset.personLabel = personId;
       labelEl.addEventListener("click", () => {
         onPersonClickRef.current?.(personId);
       });
+      labelEl.addEventListener("mouseenter", () => {
+        const v = visuals.get(personId);
+        if (!v) return;
+        const left = parseFloat(v.labelEl.style.left) || 0;
+        const top = parseFloat(v.labelEl.style.top) || 0;
+        showTooltip(v.node, left, top);
+      });
+      labelEl.addEventListener("mouseleave", hideTooltip);
       const nameEl = document.createElement("div");
       nameEl.className = "text-[11px] font-medium tracking-tight";
       nameEl.style.transition = "color 700ms";
@@ -415,6 +463,7 @@ export function PeopleGraph({
           uProgress: { value: 0 },
           uPulse: { value: 0 },
           uSize: { value: tier.size },
+          uTime: { value: 0 },
           uColor: { value: INK.clone() },
           uAccentColor: { value: ORANGE.clone() },
           uAccent: { value: 0 },
@@ -538,6 +587,73 @@ export function PeopleGraph({
     const worldPos = new THREE.Vector3();
     const ndc = new THREE.Vector3();
 
+    // Drag-to-rotate: user drag overrides the idle spin; a short grace period
+    // after release keeps the manual angle, then the gentle auto-spin resumes.
+    const DRAG_SPEED = 0.008;
+    const RESUME_DELAY_MS = 2500;
+    let dragging = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let manualYaw = 0;
+    let manualPitch = 0;
+    let userControlled = false;
+    let lastInteraction = 0;
+
+    // Drag starts pending: we only capture the pointer (which would swallow the
+    // label's click) once the cursor actually moves past a small threshold, so a
+    // plain click on a person still fires and queues them.
+    const DRAG_THRESHOLD_PX = 4;
+    let pendingPointerId: number | null = null;
+
+    function onPointerDown(e: PointerEvent) {
+      // Let clicks on a person label through — don't arm the drag on them.
+      if ((e.target as HTMLElement).closest("[data-person-label]")) return;
+      pendingPointerId = e.pointerId;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    }
+    function onPointerMove(e: PointerEvent) {
+      if (pendingPointerId === e.pointerId && !dragging) {
+        if (
+          Math.abs(e.clientX - lastPointerX) + Math.abs(e.clientY - lastPointerY) <
+          DRAG_THRESHOLD_PX
+        )
+          return;
+        dragging = true;
+        userControlled = true;
+        mount.setPointerCapture(e.pointerId);
+        mount.style.cursor = "grabbing";
+      }
+      if (!dragging) return;
+      manualYaw += (e.clientX - lastPointerX) * DRAG_SPEED;
+      manualPitch += (e.clientY - lastPointerY) * DRAG_SPEED;
+      manualPitch = Math.max(-1.2, Math.min(1.2, manualPitch));
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    }
+    function onPointerUp(e: PointerEvent) {
+      pendingPointerId = null;
+      if (!dragging) return;
+      dragging = false;
+      lastInteraction = performance.now();
+      if (mount.hasPointerCapture(e.pointerId))
+        mount.releasePointerCapture(e.pointerId);
+      mount.style.cursor = "grab";
+    }
+    // Wheel zoom: an additive offset on top of the auto-dolly fit distance,
+    // clamped so the constellation can't be pushed inside-out or lost.
+    let zoomOffset = 0;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      zoomOffset += e.deltaY * ZOOM_SPEED;
+      zoomOffset = Math.max(-3.2, Math.min(6, zoomOffset));
+    }
+    mount.style.cursor = "grab";
+    mount.addEventListener("pointerdown", onPointerDown);
+    mount.addEventListener("pointermove", onPointerMove);
+    mount.addEventListener("pointerup", onPointerUp);
+    mount.addEventListener("wheel", onWheel, { passive: false });
+
     function animate(timestamp: number) {
       animationFrame = requestAnimationFrame(animate);
       timer.update(timestamp);
@@ -558,10 +674,22 @@ export function PeopleGraph({
       dustOpacity += (dustTarget - dustOpacity) * smoothing;
       dustMaterial.uniforms.uOpacity.value = dustOpacity;
 
-      // World rotation (slower while people are on screen so labels stay readable).
-      const rotationScale = visuals.size > 0 ? 0.45 : 1;
-      world.rotation.y += IDLE_ROTATION_SPEED * rotationScale * (dt * 60);
-      world.rotation.x = Math.sin(elapsed * 0.05) * 0.15;
+      // World rotation: drag-to-rotate takes over; auto-spin resumes after a
+      // grace period since the last interaction.
+      const sinceInteraction = performance.now() - lastInteraction;
+      if (!dragging && userControlled && sinceInteraction > RESUME_DELAY_MS) {
+        userControlled = false;
+      }
+      if (userControlled) {
+        world.rotation.y = manualYaw;
+        world.rotation.x = manualPitch;
+      } else {
+        const rotationScale = visuals.size > 0 ? 0.45 : 1;
+        manualYaw += IDLE_ROTATION_SPEED * rotationScale * (dt * 60);
+        manualPitch = Math.sin(elapsed * 0.05) * 0.15;
+        world.rotation.y = manualYaw;
+        world.rotation.x = manualPitch;
+      }
       world.updateMatrixWorld();
 
       // Camera dolly: fit height and width separately (wide screens can keep
@@ -581,10 +709,15 @@ export function PeopleGraph({
       }
       const needZ =
         Math.max(maxY / halfTan, maxH / (halfTan * camera.aspect)) * 1.15 + 1.0;
-      const cameraTarget =
+      const fitZ =
         visuals.size > 0
           ? Math.min(Math.max(needZ, CAMERA_IDLE_Z), CAMERA_MAX_Z)
           : CAMERA_IDLE_Z;
+      // User wheel zoom rides on top of the auto-fit distance.
+      const cameraTarget = Math.max(
+        CAMERA_MIN_Z,
+        Math.min(CAMERA_MAX_Z, fitZ + zoomOffset),
+      );
       camera.position.z +=
         (cameraTarget - camera.position.z) * (1 - Math.exp(-dt * 2.2));
 
@@ -613,6 +746,7 @@ export function PeopleGraph({
         const uniforms = v.clusterMaterial.uniforms;
         uniforms.uProgress.value = v.progress;
         uniforms.uPulse.value = v.pulse;
+        uniforms.uTime.value = elapsed;
         uniforms.uOpacity.value = v.opacity;
         uniforms.uAccent.value = v.accent;
         (uniforms.uColor.value as THREE.Color).copy(v.color);
@@ -685,7 +819,6 @@ export function PeopleGraph({
     animate(performance.now());
 
     function handleResize() {
-      if (!mount) return;
       camera.aspect = mount.clientWidth / mount.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(mount.clientWidth, mount.clientHeight);
@@ -698,6 +831,10 @@ export function PeopleGraph({
     return () => {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
+      mount.removeEventListener("pointerdown", onPointerDown);
+      mount.removeEventListener("pointermove", onPointerMove);
+      mount.removeEventListener("pointerup", onPointerUp);
+      mount.removeEventListener("wheel", onWheel);
       for (const [id, v] of visuals) removePerson(id, v);
       dustGeometry.dispose();
       dustMaterial.dispose();

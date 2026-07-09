@@ -27,43 +27,42 @@ export function AppNav({
 
   return (
     <header className="relative z-50 flex items-center justify-between gap-6">
-      <div className="flex items-center gap-8">
-        <span className="flex items-baseline gap-3">
-          <Link
-            href="/"
-            className="font-display text-xl uppercase tracking-tight"
-          >
-            AutoDeck
-          </Link>
-          {context ? (
-            <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              / {context}
-            </span>
-          ) : null}
-        </span>
-        <nav className="flex items-center gap-5 text-xs font-medium uppercase tracking-[0.2em]">
-          {LINKS.map((link) => {
-            const active =
-              link.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "transition-colors",
-                  active
-                    ? "text-accent-orange"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+      <div className="flex flex-col">
+        <Link
+          href="/"
+          className="font-display text-3xl uppercase leading-none tracking-tight md:text-4xl"
+        >
+          AutoDeck
+        </Link>
+        {context ? (
+          <span className="mt-1 text-sm font-medium uppercase tracking-[0.2em] text-accent-orange">
+            {context}
+          </span>
+        ) : null}
       </div>
+
+      <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-10 text-xs font-medium uppercase tracking-[0.2em]">
+        {LINKS.map((link) => {
+          const active =
+            link.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(link.href);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "transition-colors",
+                active
+                  ? "text-accent-orange"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {link.label}
+            </Link>
+          );
+        })}
+      </nav>
 
       <div className="flex items-center gap-4">{children}</div>
     </header>
