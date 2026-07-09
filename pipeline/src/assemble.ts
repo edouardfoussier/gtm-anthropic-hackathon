@@ -37,6 +37,9 @@ function fades(dwell: number): { fadeDur: number; fadeOutStart: number } {
   return { fadeDur, fadeOutStart: Math.max(0, dwell - fadeDur) };
 }
 
+/** Subtle Ken-Burns zoom (1.0 → KEN_BURNS_ZOOM) over the light theme. */
+const KEN_BURNS_ZOOM = 1.06;
+
 /** Build one slide segment (video only) of `dwell` seconds. */
 async function slideSegment(
   slidePng: string,
@@ -45,12 +48,23 @@ async function slideSegment(
   outMp4: string,
 ): Promise<void> {
   const { fadeDur, fadeOutStart } = fades(dwell);
-  const fade = `fade=t=in:st=0:d=${fadeDur.toFixed(3)},fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDur.toFixed(3)}`;
+  // Fade through WHITE (not black): a black dip flickers on a light theme.
+  const fade =
+    `fade=t=in:st=0:d=${fadeDur.toFixed(3)}:color=white,` +
+    `fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDur.toFixed(3)}:color=white`;
 
   if (!avatarMp4) {
-    const vf = `${FIT},${fade},fps=${FPS},setsar=1,format=yuv420p`;
+    // Ken-Burns: feed the still as ONE frame (no -loop/-t); zoompan's `d` drives
+    // the exact frame count — a looped input makes zoompan emit d frames PER input
+    // frame and hang.
+    const frames = Math.max(1, Math.round(dwell * FPS));
+    const zStep = ((KEN_BURNS_ZOOM - 1) / Math.max(1, frames - 1)).toFixed(6);
+    const vf =
+      `zoompan=z='min(zoom+${zStep},${KEN_BURNS_ZOOM})':` +
+      `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
+      `d=${frames}:s=${VIDEO_W}x${VIDEO_H}:fps=${FPS},${fade},setsar=1,format=yuv420p`;
     await ff([
-      "-y", "-loop", "1", "-t", dwell.toFixed(3), "-i", slidePng,
+      "-y", "-i", slidePng,
       "-vf", vf, "-r", String(FPS),
       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-profile:v", "high",
       outMp4,

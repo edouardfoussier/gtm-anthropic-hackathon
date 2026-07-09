@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "typecheck:engine": "tsc -p engine/tsconfig.json",
-    "generate": "tsx engine/src/cli.ts",
+    "typecheck:pipeline": "tsc -p pipeline/tsconfig.json",
+    "generate": "tsx pipeline/src/cli.ts",
     "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {

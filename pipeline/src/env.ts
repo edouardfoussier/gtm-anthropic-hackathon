@@ -1,19 +1,21 @@
 /**
  * Zero-dependency env loader. Reads .env.local (then .env) from the repo root so
- * the engine picks up keys regardless of how it is launched (npx tsx, spawn from
- * a future API route, etc.). Import for side effects before reading process.env.
+ * the pipeline picks up keys regardless of how it is launched (npx tsx, spawn
+ * from a future API route, etc.). Import for side effects before reading env.
  */
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SRC_DIR = path.dirname(fileURLToPath(import.meta.url));
-/** repo root = engine/src → ../../ */
+/** repo root = pipeline/src → ../../ */
 export const ROOT = path.resolve(SRC_DIR, "..", "..");
-export const ENGINE_DIR = path.join(ROOT, "engine");
-export const OUT_DIR = path.join(ENGINE_DIR, "out");
-export const CACHE_DIR = path.join(ENGINE_DIR, ".cache");
-export const ASSETS_DIR = path.join(ENGINE_DIR, "assets");
+export const PIPELINE_DIR = path.join(ROOT, "pipeline");
+export const OUT_DIR = path.join(PIPELINE_DIR, "out");
+export const CACHE_DIR = path.join(PIPELINE_DIR, ".cache");
+export const ASSETS_DIR = path.join(PIPELINE_DIR, "assets");
+/** Shared brand assets (company logos, team photos) live in the repo-root data/. */
+export const DATA_DIR = path.join(ROOT, "data");
 
 for (const name of [".env.local", ".env"]) {
   const p = path.join(ROOT, name);

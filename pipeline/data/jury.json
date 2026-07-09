@@ -15,5 +15,6 @@
   { "id": "andrey-lokot", "firstName": "Andrey", "lastName": "Lokot", "company": "DataWave", "title": "Founding GTM", "linkedin": "https://www.linkedin.com/in/alokot/" },
   { "id": "christa-dabilly", "firstName": "Christa", "lastName": "Dabilly", "company": "Edenred", "title": "Head of Tech Stack for RevOps", "linkedin": "https://www.linkedin.com/in/christadabilly/" },
   { "id": "camille-allain", "firstName": "Camille", "lastName": "Allain", "company": "", "title": "", "linkedin": "https://www.linkedin.com/in/camille-allain-51b7a2106/" },
-  { "id": "paul-francois-goriaux", "firstName": "Paul-François", "lastName": "Goriaux", "company": "", "title": "", "linkedin": "https://www.malt.fr/profile/paulfrancoisgoriaux1" }
+  { "id": "paul-francois-goriaux", "firstName": "Paul-François", "lastName": "Goriaux", "company": "", "title": "", "linkedin": "https://www.malt.fr/profile/paulfrancoisgoriaux1" },
+  { "id": "helwan-le-luhandre-merah", "firstName": "Helwan", "lastName": "Le Luhandre – Merah", "company": "", "title": "", "linkedin": "https://www.linkedin.com/in/helwan/" }
 ]
