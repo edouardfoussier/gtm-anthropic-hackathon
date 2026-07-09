@@ -43,7 +43,9 @@ export function ContactDrawer({
     <div
       className={cn(
         "fixed inset-y-0 right-80 z-40 flex w-full max-w-sm flex-col gap-6 border-l border-border bg-card p-6 shadow-[-8px_0_24px_-12px_rgba(0,0,0,0.15)] transition-transform duration-300",
-        contact ? "translate-x-0" : "translate-x-full",
+        contact
+          ? "pointer-events-auto translate-x-0"
+          : "pointer-events-none translate-x-full",
       )}
     >
       {contact ? (
