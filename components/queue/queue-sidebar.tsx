@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQueue } from "@/components/queue/queue-context";
 import { cn } from "@/lib/utils";
 import type { QueueStatus } from "@/lib/types";
@@ -18,12 +19,38 @@ const STATUS_DOT_CLASS: Record<QueueStatus, string> = {
 
 export function QueueSidebar() {
   const { items } = useQueue();
+  const [open, setOpen] = useState(true);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open pipeline queue"
+        className="relative z-30 flex w-10 shrink-0 items-center justify-center border-l border-border bg-card text-muted-foreground hover:text-foreground"
+      >
+        <span className="-rotate-90 whitespace-nowrap text-xs font-medium uppercase tracking-[0.2em]">
+          Queue{items.length > 0 ? ` · ${items.length}` : ""}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <aside className="relative z-30 flex w-80 shrink-0 flex-col gap-4 border-l border-border bg-card p-6">
-      <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        02 — Pipeline queue
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          02 — Pipeline queue
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close pipeline queue"
+          className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+        >
+          Close
+        </button>
+      </div>
 
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">

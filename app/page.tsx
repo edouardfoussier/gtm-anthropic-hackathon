@@ -144,7 +144,7 @@ export default function Home() {
           </PageShell>
         </div>
 
-        <QueueSidebar />
+        {expanded ? <QueueSidebar /> : null}
       </div>
 
       {prospect ? (
