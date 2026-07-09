@@ -46,8 +46,8 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 | App | Next.js **16.2.10** (App Router) + React 19.2 + TypeScript strict + Tailwind **v4** + shadcn/ui (base-nova preset) |
 | Theme | Light, premium, salesy. ONE accent: electric blue `#2563EB`. **NOT orange.** |
 | Graph | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down |
-| LLM | AI SDK (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured outputs (`Output.object`) |
-| Sillage | **MCP client** (AI SDK `experimental_createMCPClient`, streamable-HTTP/SSE) — no public REST API |
+| LLM | AI SDK **v7** (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured output via `generateText({ output: Output.object })` |
+| Sillage | **MCP client** via `@ai-sdk/mcp` (`createMCPClient`, native `{type:'http'}` transport) — **not in `ai@7`**, install when access lands; no public REST API |
 | FullEnrich | REST **v2** (Bearer) |
 | Package manager | **npm** — do not switch |
 | State | In-memory + JSON files in `data/` — no DB |
@@ -95,9 +95,10 @@ npx shadcn@latest add <component>   # add shadcn/ui components
 ```
 app/            # routes + API — thin wiring only; long jobs spawn engine scripts via npx tsx
 components/     # UI; components/graph/ = Three.js scene behind data-only props; components/ui/ = shadcn
-lib/            # adapters (sillage, fullenrich, gamma, email) + claude steps (orchestrator, research, script) + utils.ts (shadcn cn)
+agentic/        # THE AGENT LAYER (decoupled, pure TS, NO next/*): sillage + fullenrich adapters, orchestrator (runProspect), Claude pick, mocks, store (memory), types (event/state contract). Entry + smoke: agentic/run.ts. See D009.
+lib/            # shadcn utils.ts (cn) + app-side helpers (gamma, email, research, script). Agent orchestration lives in agentic/ (D009)
 engine/         # EDOUARD'S LANE — standalone tsx scripts: tts.ts, assemble.ts, avatar.ts
-data/           # prospects/{id}.json · slides/{id}/*.png  ← the lane contract (gitignored, .gitkeep'd)
+data/           # prospects/{id}.json (+ {id}.events.jsonl log) · seen.json · slides/{id}/*.png  ← the lane contract (gitignored, .gitkeep'd)
 public/videos/  # {id}.mp4 + {id}.jpg  ← engine output (gitignored)
 scripts/        # smoke.ts and other throwaway runners
 ```
@@ -110,7 +111,7 @@ scripts/        # smoke.ts and other throwaway runners
 
 ## Partner adapters — exact facts (verified 2026-07-09)
 
-- **Sillage** (`lib/sillage.ts`): **MCP only.** Server URL + auth handed at kickoff (login with the registered email; workspace at hackathon.getsillage.com, ≤20 tracked accounts). Connect via AI SDK MCP client; wrap tools as `getSignals(company) → Signal[]` and `getPeople(company) → Person[]`. **Write against the mock first**, plug the real MCP the moment access lands. In v2, hand the MCP tools to Claude directly.
+- **Sillage** (`agentic/sillage.ts`): **MCP only.** Server URL + auth handed at kickoff (login with the registered email; workspace at hackathon.getsillage.com, ≤20 tracked accounts). MCP client is in **`@ai-sdk/mcp`** (NOT `ai@7`) — install it and use the native `{ type:'http', url, headers }` transport; wrap tools as `getSignals(company) → Signal[]` and `getPeople(company) → Person[]`, Zod-parsed at the boundary. **Written against the mock first** (real branch is a marked TODO that falls back to mock); plug the real MCP the moment access lands. In v2, hand the MCP tools to Claude directly.
 - **FullEnrich** (`lib/fullenrich.ts`): **v2 API** — docs: https://docs.fullenrich.com (index: `/llms.txt`). `POST https://app.fullenrich.com/api/v2/contact/enrich/bulk`, `Authorization: Bearer`. Async waterfall → poll `GET /api/v2/contact/enrich/bulk` (skip webhooks). Key from https://app.fullenrich.com/app/api. Also: `POST /api/v2/people/search` + `/api/v2/company/search` for v1 prospecting. The brief's v1 URL is outdated — use v2.
 - **Gamma** (`lib/gamma.ts`): `POST https://public-api.gamma.app/v1.0/generations` — header **`X-API-KEY`** (NOT Bearer). Body: `{ inputText, textMode, format: "presentation", numCards: 6-8, exportAs: "png" }`. Poll `GET /v1.0/generations/{id}` until done → `gammaUrl` + `exportUrl` (signed, ~1 week). **Surface `gammaUrl` in the UI** ("open in Gamma") — visible Gamma love for the prize. Docs: https://developers.gamma.app
 - **Gradium** (`engine/tts.ts`): `POST https://api.gradium.ai/api/post/speech/tts`, header `x-api-key`, body `{ text, voice_id, output_format: "wav", only_audio: true, model_name: "default" }`. Voice id from `GRADIUM_VOICE_ID` (cloned voice).
@@ -194,3 +195,6 @@ See `.env.example` (committed, kept in sync — it is the authoritative list):
 - **D006** — 2026-07-09 — Video pipeline rebuilt from scratch in `engine/` (Diffender reuse code unavailable in this repo); its gotchas kept as rules above.
 - **D007** — 2026-07-09 — npm; in-memory + JSON state; no DB, no test suite — one smoke script for the demo path.
 - **D008** — 2026-07-09 — Scaffold live at repo root: create-next-app (Next 16.2.10, React 19.2.4, Tailwind v4, ESLint 9, `--app --no-src-dir`, alias `@/*`) + shadcn/ui init (`-d`, base-nova) + deps `three ai @ai-sdk/anthropic zod resend @fal-ai/client` (+ dev: `@types/three tsx`). Lane folders + `.gitkeep`s created; `data/*` and `public/videos/*` gitignored; `.env.example` committed; `scripts/smoke.ts` seeded. Typecheck + build + smoke all pass.
+- **D009** — 2026-07-09 — Agent orchestration built as a decoupled, pure-TypeScript module in `agentic/` (no `next/*` imports), not scattered across `lib/`. Core = `runProspect(input, {onEvent, signal})`: transport-agnostic, emits a typed `AgentEvent` stream (UI seam) and persists `ProspectState` to `data/prospects/{id}.json` (pipeline seam). `agentic/run.ts` is the standalone entry + agent-layer smoke check (runs the full flow on mocks, asserts the event sequence + written state). Rationale: build/test independently now; a one-file SSE route and the video pipeline both plug into the two seams later. Supersedes the lib/-scattered adapter layout for sillage/fullenrich/orchestrator (folder tree updated in place).
+- **D010** — 2026-07-09 — Flow is **Sillage-first** (confirms the AGENTS.md architecture over the alternative "Sillage-last detection" order): Sillage supplies people + signals → one Claude structured pick (`generateText({ output: Output.object })`) ranks/picks/writes the angle → FullEnrich enriches the pick. A `hot` signal on a person emits `signal_detected` → UI paints that node red. Every step degrades to a deterministic fallback (no `ANTHROPIC_API_KEY` → scored pick; adapter failure/timeout → mock), so the run never hangs or throws. MVP = single run per company; Autopilot is a later wrapper over `runProspect`.
+- **D011** — 2026-07-09 — SDK reality corrections (refines D003 + stack table): the AI SDK **MCP client is not in `ai@7`** — it moved to `@ai-sdk/mcp` (install when Sillage access lands; native `{type:'http'}` transport avoids a direct `@modelcontextprotocol/sdk` dep). Structured output = `generateText({ output: Output.object({ schema }) })` (`experimental_output` and `generateObject` are out on v7). Zod is **v4**. Memory persisted three ways (all three consumers confirmed): `data/prospects/{id}.json` (state), `{id}.events.jsonl` (append-only decision log), `data/seen.json` (global seen-companies cache).
