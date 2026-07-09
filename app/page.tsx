@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageShell } from "@/components/layout/page-shell";
 import { PeopleGraph } from "@/components/graph/people-graph";
 import type { PersonNode, PersonStatus } from "@/components/graph/types";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ContactDrawer } from "@/components/prospect/contact-drawer";
 import { QueueSidebar } from "@/components/queue/queue-sidebar";
 import { QueueProvider } from "@/components/queue/queue-context";
-import { buildMockProspect } from "@/lib/mock-prospect";
+import { buildMockProspect, type RealProspect } from "@/lib/mock-prospect";
 import type { Prospect, RelationshipKind } from "@/lib/types";
 
 /** The company itself is the graph's root node — every contact reports to it. */
@@ -36,7 +36,7 @@ function toPeopleNodes(prospect: Prospect): PersonNode[] {
     return {
       id: contact.id,
       name: contact.name,
-      title: contact.title,
+      title: contact.title || (contact.juryId ? "Real prospect" : ""),
       status: relationship ? RELATIONSHIP_STATUS[relationship.kind] : "pending",
       seniority: relationship?.kind === "decision_maker" ? 2 : 3,
       reportsTo: COMPANY_ROOT_ID,
@@ -51,6 +51,22 @@ export default function Home() {
   const [companyInput, setCompanyInput] = useState("");
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const [realProspects, setRealProspects] = useState<RealProspect[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/prospects")
+      .then((res) => res.json())
+      .then((data: { prospects: RealProspect[] }) => {
+        if (!cancelled) setRealProspects(data.prospects);
+      })
+      .catch(() => {
+        /* real-prospect matching is a nice-to-have — mock flow still works */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const people = useMemo(
     () => (prospect ? toPeopleNodes(prospect) : undefined),
@@ -60,7 +76,7 @@ export default function Home() {
   function handleSubmit(event: React.SubmitEvent) {
     event.preventDefault();
     if (!companyInput.trim()) return;
-    setProspect(buildMockProspect(companyInput.trim()));
+    setProspect(buildMockProspect(companyInput.trim(), realProspects));
   }
 
   function handlePersonClick(personId: string) {

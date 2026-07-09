@@ -17,6 +17,8 @@ export interface Contact {
   email: string;
   phone: string;
   linkedin: string;
+  /** Set when this contact matches a real jury prospect — routes the CTA into the real pipeline. */
+  juryId?: string;
 }
 
 export type RelationshipKind = "signal_source" | "champion" | "decision_maker";

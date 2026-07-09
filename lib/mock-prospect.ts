@@ -1,4 +1,11 @@
-import type { Prospect, Signal, SignalKind } from "@/lib/types";
+import type { Contact, Prospect, Signal, SignalKind } from "@/lib/types";
+
+export interface RealProspect {
+  id: string;
+  firstName: string;
+  lastName: string;
+  company: string;
+}
 
 const SIGNAL_TEMPLATES: { kind: SignalKind; label: (company: string) => string }[] = [
   {
@@ -58,8 +65,16 @@ function slugify(company: string): string {
  * Deterministic mock standing in for Sillage (signals) + FullEnrich
  * (contact data) — same shape the real adapters will return, so this
  * file is a drop-in replacement point, not throwaway.
+ *
+ * When `realProspects` includes a jury member at this company, that
+ * contact's name/title come from the real record and carry a `juryId` so
+ * the UI can route "Contact" into the real video pipeline instead of the
+ * mock queue.
  */
-export function buildMockProspect(companyName: string): Prospect {
+export function buildMockProspect(
+  companyName: string,
+  realProspects: RealProspect[] = [],
+): Prospect {
   const id = slugify(companyName) || "prospect";
   const rand = seededRandom(hashString(companyName));
 
@@ -72,9 +87,24 @@ export function buildMockProspect(companyName: string): Prospect {
     }),
   );
 
-  const contactCount = 2 + Math.floor(rand() * 2);
+  const matches = realProspects.filter(
+    (p) => p.company.trim().toLowerCase() === companyName.trim().toLowerCase(),
+  );
+
+  const mockContactCount = Math.max(2 + Math.floor(rand() * 2) - matches.length, 1);
   const domain = `${slugify(companyName)}.com`;
-  const contacts = Array.from({ length: contactCount }, (_, index) => {
+
+  const realContacts: Contact[] = matches.map((match) => ({
+    id: match.id,
+    name: `${match.firstName} ${match.lastName}`,
+    title: "",
+    email: "",
+    phone: "",
+    linkedin: "",
+    juryId: match.id,
+  }));
+
+  const mockContacts: Contact[] = Array.from({ length: mockContactCount }, (_, index) => {
     const firstName = FIRST_NAMES[Math.floor(rand() * FIRST_NAMES.length)];
     const lastName = LAST_NAMES[Math.floor(rand() * LAST_NAMES.length)];
     const title = TITLES[Math.floor(rand() * TITLES.length)];
@@ -87,6 +117,8 @@ export function buildMockProspect(companyName: string): Prospect {
       linkedin: `linkedin.com/in/${firstName.toLowerCase()}-${lastName.toLowerCase()}`,
     };
   });
+
+  const contacts = [...realContacts, ...mockContacts];
 
   const relationships = contacts.map((contact, index) => ({
     id: `${id}-rel-${index}`,

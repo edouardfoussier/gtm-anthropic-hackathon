@@ -1,6 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useQueue } from "@/components/queue/queue-context";
 import { cn } from "@/lib/utils";
 import type { Contact, Prospect } from "@/lib/types";
@@ -49,15 +51,18 @@ export function ContactDrawer({
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium uppercase tracking-[0.2em] text-accent-orange">
-                {relationship
-                  ? RELATIONSHIP_LABEL[relationship.kind]
-                  : "Contact"}
+                {contact.juryId
+                  ? "Real prospect"
+                  : relationship
+                    ? RELATIONSHIP_LABEL[relationship.kind]
+                    : "Contact"}
               </span>
               <h3 className="font-display text-2xl uppercase leading-none tracking-tight">
                 {contact.name}
               </h3>
               <span className="text-sm text-muted-foreground">
-                {contact.title} · {prospect.companyName}
+                {contact.title ? `${contact.title} · ` : ""}
+                {prospect.companyName}
               </span>
             </div>
             <button
@@ -78,35 +83,47 @@ export function ContactDrawer({
             </div>
           ) : null}
 
-          <dl className="flex flex-col gap-3 border-t border-border pt-4 text-sm">
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Email
-              </dt>
-              <dd>{contact.email}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Phone
-              </dt>
-              <dd>{contact.phone}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                LinkedIn
-              </dt>
-              <dd>{contact.linkedin}</dd>
-            </div>
-          </dl>
+          {!contact.juryId ? (
+            <dl className="flex flex-col gap-3 border-t border-border pt-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Email
+                </dt>
+                <dd>{contact.email}</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Phone
+                </dt>
+                <dd>{contact.phone}</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  LinkedIn
+                </dt>
+                <dd>{contact.linkedin}</dd>
+              </div>
+            </dl>
+          ) : null}
 
-          <Button
-            size="lg"
-            className="mt-auto"
-            disabled={alreadyQueued}
-            onClick={() => handleContact(contact)}
-          >
-            {alreadyQueued ? "Queued" : "Contact"}
-          </Button>
+          {contact.juryId ? (
+            <Link
+              href={`/reachout/${contact.juryId}`}
+              className={cn(buttonVariants({ size: "lg" }), "mt-auto")}
+            >
+              Build the pitch
+              <ArrowRight />
+            </Link>
+          ) : (
+            <Button
+              size="lg"
+              className="mt-auto"
+              disabled={alreadyQueued}
+              onClick={() => handleContact(contact)}
+            >
+              {alreadyQueued ? "Queued" : "Contact"}
+            </Button>
+          )}
         </>
       ) : null}
     </div>
