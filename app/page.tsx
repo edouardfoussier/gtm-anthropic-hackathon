@@ -164,7 +164,10 @@ function HomeInner() {
     <div className="flex flex-1">
       <div className="flex flex-1 flex-col">
         <PageShell className="flex flex-1 flex-col">
-          <AppNav context={expanded && prospect ? prospect.companyName : undefined}>
+          <AppNav
+            showTabs={expanded}
+            context={expanded && prospect ? prospect.companyName : undefined}
+          >
             {expanded ? (
               <button
                 type="button"
