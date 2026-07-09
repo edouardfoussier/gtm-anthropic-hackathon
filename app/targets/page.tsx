@@ -1,6 +1,5 @@
-import Link from "next/link";
-
 import { PageShell } from "@/components/layout/page-shell";
+import { AppNav } from "@/components/layout/app-nav";
 import { TargetTable } from "@/components/targets/target-table";
 import { getLeads } from "@/lib/leads";
 
@@ -13,29 +12,7 @@ export default async function TargetsPage() {
 
   return (
     <PageShell className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between">
-        <span className="font-display text-xl uppercase tracking-tight">
-          AutoDeck
-        </span>
-        <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          CRM
-        </span>
-      </header>
-
-      <nav className="mt-6 flex items-center gap-6 border-b border-border text-sm font-medium">
-        <span className="-mb-px border-b-2 border-accent pb-3 text-foreground">
-          Targets
-        </span>
-        <span className="cursor-default pb-3 text-muted-foreground/50">
-          Campaigns
-        </span>
-        <Link
-          href="/dashboard"
-          className="pb-3 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Dashboard
-        </Link>
-      </nav>
+      <AppNav />
 
       <main className="flex flex-1 flex-col gap-8 py-12">
         <div className="flex flex-col gap-3">
