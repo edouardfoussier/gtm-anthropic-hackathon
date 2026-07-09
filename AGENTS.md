@@ -39,13 +39,12 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 
 ## Stack
 
-
 | Layer           | Choice                                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | App             | Next.js **16.2.10** (App Router) + React 19.2 + TypeScript strict + Tailwind **v4**                                                                                                        |
 | UI components   | shadcn/ui initialized (base-nova preset, **Base UI — not Radix**) — **PROVISIONAL, not locked**: component-layer deep research pending; don't build deep dependencies on its internals yet |
-| Design          | **LOCKED:** light, premium, salesy style; the **Three.js node graph is the visual centerpiece** of the product. Colors only: to define (D011).                                             |
-| Graph           | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down                         |
+| Design          | **LOCKED:** editorial, minimalist, startup-inspired (Linear/Stripe/Figma); the **Three.js node graph is the visual centerpiece** of the product. Colors: **LOCKED (D015)** — off-white bg `#F7F7F5`, near-black text `#111111`, ONE accent orange `#FF6500` used sparingly. Supersedes D011's "to define". |
+| Graph           | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down. Restyled as a dot-particle sphere (D015): builds up point-by-point as nodes resolve, permanent slow rotational drift, orange dots. |
 | LLM             | AI SDK (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured outputs (`Output.object`)                                                                                         |
 | Sillage         | **MCP client OR V2 API** — whichever access lands first at kickoff; adapter interface is the invariant                                                                                     |
 | FullEnrich      | REST **v2** (Bearer)                                                                                                                                                                       |
@@ -54,9 +53,6 @@ Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch
 | Email           | Resend (video as **link, never attachment**)                                                                                                                                               |
 | Live notify     | SSE (or simple polling)                                                                                                                                                                    |
 | Video tooling   | ffmpeg + Playwright, local, run from `engine/`                                                                                                                                             |
-
-
-
 
 ## Commands
 
@@ -209,7 +205,6 @@ See `.env.example` (committed, kept in sync — it is the authoritative list):
 
 **Deliberately open (decide later, never hardcode in the meantime):**
 
-- Colors / palette (D011) — define during theme work
 - UI component layer (D010) — shadcn provisional, keep usage shallow
 - Graph layout algorithm (radial vs force-directed vs hybrid) — Lane A prototypes, then logs the pick
 - Avatar model + narration voice — **Edouard's call** (D013)
@@ -221,6 +216,10 @@ See `.env.example` (committed, kept in sync — it is the authoritative list):
 - Graph animates **progressively** — nodes land as each adapter returns; slow enrichment never blocks the moment.
 - Target/jury companies are added to the Sillage workspace **at kickoff** (≤20 accounts) so signals have time to populate.
 - App deploys on **Vercel**; video generation stays local (see Timing strategy).
+
+**Locked (D015):**
+
+- Colors / palette — off-white `#F7F7F5` bg, near-black `#111111` text, orange `#FF6500` accent (editorial, not electric blue).
 
 ## Decision log (append-only, newest last)
 
@@ -238,4 +237,4 @@ See `.env.example` (committed, kept in sync — it is the authoritative list):
 - **D012** — 2026-07-09 — Design **locked as design, not colors**: light/premium/salesy style + the Three.js node graph as the visual centerpiece (with D001). Only the palette stays open (D011).
 - **D013** — 2026-07-09 — Delegated/open by team choice: fal.ai avatar model + narration voice are **Edouard's call** (Lane B); email sender domain and demo assets (presenter photo, chaching.mp3) stay **open** — sender must be settled before the phone deliverability test. Graph layout algorithm also open (Lane A prototypes first). `AUTODECK-BRIEF.md` got a superseded-banner so no agent follows its outdated instructions.
 - **D014** — 2026-07-09 — **Vercel deploy locked** for the app (share page + tracking); video generation stays local (ffmpeg/Playwright can't run there) — pre-baked videos reach production via commit+deploy or Vercel Blob. Confirmed working rules: progressive graph animation (nodes land per adapter); Sillage workspace gets the target/jury companies at kickoff. Supersedes the tunnel-vs-Vercel day-of decision.
-
+- **D015** — 2026-07-09 — Tom (UI lane): closes D011 — accent color is **orange `#FF6500`**, not electric blue. Editorial/risograph design system (off-white `#F7F7F5` bg, near-black `#111111` text, condensed ALL-CAPS display headings, numbered sections `01`/`02`, no shadows/gradients/glassmorphism). Supersedes the brief's §3 blue-accent note. Rejected: blue accent (brief default) — team wants a distinct editorial identity, not a generic SaaS blue. Contact-graph surface (D001) stays vanilla Three.js but restyled as a dot-particle sphere: builds up point-by-point as nodes resolve, permanent slow rotational drift, orange dots on off-white/near-black.
