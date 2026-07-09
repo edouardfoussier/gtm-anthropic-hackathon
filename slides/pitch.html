@@ -115,7 +115,8 @@
         flex-direction: column;
         gap: 28px;
         flex: 1;
-        justify-content: center;
+        justify-content: flex-start;
+        padding-top: 6vh;
       }
 
       /* --- slide 1 hook --- */
@@ -132,20 +133,26 @@
       /* --- slide 2 problem : big number --- */
       .stat-row {
         display: flex;
-        align-items: baseline;
-        gap: 32px;
+        align-items: flex-end;
+        gap: 48px;
         flex-wrap: wrap;
       }
       .stat {
         font-family: "Anton", "Arial Narrow", "Helvetica Neue Condensed", sans-serif;
-        font-size: clamp(5rem, 16vw, 15rem);
-        line-height: 0.8;
+        font-size: clamp(4.5rem, 13vw, 12rem);
+        line-height: 0.85;
         color: var(--orange);
+        white-space: nowrap;
+      }
+      .stat-unit {
+        font-size: 0.4em;
+        margin-left: 0.35em;
       }
       .stat-label {
         font-size: clamp(1.2rem, 2vw, 2rem);
-        max-width: 20ch;
-        line-height: 1.15;
+        max-width: 22ch;
+        line-height: 1.2;
+        padding-bottom: 0.4em;
       }
 
       /* --- slide 3 flow diagram --- */
@@ -298,17 +305,12 @@
         <div class="body">
           <span class="eyebrow"><span class="num">01</span>Why reps don't do it</span>
           <div class="stat-row">
-            <span class="stat">45<span style="font-size: 0.4em">min</span></span>
+            <span class="stat">45<span class="stat-unit">min</span></span>
             <span class="stat-label">
               to research, build, record &amp; edit <strong>one</strong>
               personalized video pitch.
             </span>
           </div>
-          <p class="lede">
-            So nobody sends them. The most effective outreach that exists —
-            <span class="strike">too slow to scale</span>. Buying intent goes
-            cold while the deck sits half-built.
-          </p>
         </div>
         <footer class="footer">
           <span>Personalized video = highest reply rate, lowest usage</span>
