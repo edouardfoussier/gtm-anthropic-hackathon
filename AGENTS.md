@@ -1,225 +1,241 @@
-# <Project Name> — Agent Guide
+# AutoDeck — Agent Guide
 
-<!-- ─────────────────────────────────────────────────────────────────────
-HOW TO USE THIS TEMPLATE (delete this comment block once filled in)
+**AutoDeck** turns an intent signal into a **personalized video pitch deck in the prospect's inbox**: Sillage finds the moment and the person, FullEnrich finds the coordinates, Claude picks the target and writes the story, Gamma builds the deck, Gradium speaks it in the seller's cloned voice, an avatar presents it, and the seller gets a live "your prospect is watching" cha-ching the second it's opened. It's not a deck generator — it's an **autopilot**: pipeline that makes itself.
 
-1. Replace every <angle-bracket> placeholder. Delete sections that truly
-   don't apply — but keep the principles; they are stack-agnostic.
-2. Create a one-line `CLAUDE.md` next to this file containing exactly:
-       @AGENTS.md
-   Claude Code auto-loads CLAUDE.md; Codex and Cursor read AGENTS.md
-   directly. AGENTS.md is the single source of truth — never let them drift.
-3. For a hackathon: fill "Project context" with the track statement and
-   demo scenario, keep the "Hackathon mode" section at the bottom.
-   For a long-lived project: delete "Hackathon mode".
-──────────────────────────────────────────────────────────────────────── -->
+This file is the **single source of truth** for working in this repo today. It is normative (new work follows it, never imitates code that violates it) and living (learned something durable? update this file in the same change). Companion doc: `AUTODECK-BRIEF.md` (full brief); where they disagree, **this file wins**.
 
-<One paragraph: what this project is, who it serves, and the single outcome
-that matters. E.g. "Agent that fuses live translated status calls with a
-persistent task ledger so a site office always knows what is blocked.">
+**Updating this file is append-only for choices.** Every product, architecture, or tooling decision gets a new numbered entry appended to the Decision log (newest last) — never rewrite or delete an old entry; supersede it ("Supersedes D00X"). Reference sections (stack table, folder tree, adapter facts, gotchas) are updated in place to stay true, and the decision that changed them gets logged.
 
-This file is the single source of truth for working in this repo. Read it before starting any task. It is:
+## The event (context every agent needs)
 
-- **Normative** — the current implementation may not satisfy every rule yet; new work must move the codebase *toward* these practices, never imitate existing code that violates them.
-- **Living** — when you learn something durable (architecture decision, constraint, incident, convention), update this file **in the same change**. Do not use hidden memory as a substitute for updating this file.
+Agentic GTM Hackathon, Station F — **build 9:30 → submission 17:30 → pitch 18:00, TODAY (2026-07-09)**.
 
-## Project context
+- **Mandatory in the pipeline: Anthropic + Sillage + FullEnrich** — submission rule AND a 25-pt judging criterion. Mocks are stage insurance, not the plan.
+- Judging: 4 × 25 pts — business impact · depth of Anthropic use · depth of Sillage/FullEnrich use · presentation.
+- Bonus prizes we chase: **Best Use of Gamma ($1000)**, **Best Use of Gradium ($500)**, Most Creative GTM Angle, Crowd Favorite (loudest demo — DB-meter, hence the LOUD cha-ching).
+- Submission: 2-min demo video + GitHub repo + short description. Pitch rounds are 1:30 pitch + 1:30 demo.
 
-<What the product does, end to end. Domain vocabulary the code must align
-with. The core flow as a short diagram or numbered list. For a hackathon:
-paste the track statement verbatim here, then state your chosen scenario,
-which capability is load-bearing (the thing the demo cannot work without),
-and the judging criteria you are optimizing for.>
 
-```
-<core flow, e.g.:>
-<Input (voice / event / user action)>
-  └── <processing step — which API/primitive, what it produces>
-        └── <state held where, keyed by what>
-              └── <output surfaced to whom, how>
-```
+
+## The judged demo script — every technical choice serves this
+
+1. On stage: type a **jury member's company** into AutoDeck.
+2. **Live**: Sillage signals + people → Claude picks the best contact → FullEnrich enriches → nodes pop onto the **3D contact graph** with a satisfying animation.
+3. Show the **pre-generated** video deck for that company: Gamma slides, avatar bottom-right, cloned-voice narration.
+4. Click **Send** → real email lands in the jury member's inbox, live.
+5. They open it, press play → **LOUD cha-ching 🔔💰 + toast "🎬 {Name} is watching — 0:12 watched"**.
+6. Flip **Autopilot**: signal feed auto-queues the next 3 prospects with decks generating. Close.
+
+**Never run the full generation chain live** (Gamma ~1-3 min, avatar ~2-5 min). Live = input → graph → send → cha-ching. Videos are pre-baked in the afternoon.
+
+## Product staging — build in this order, each stage demoable
+
+- **v0 (JUDGED PATH):** company-name input → Sillage signals + people → **one Claude structured-output call** ranks people, picks the best contact, writes the outreach angle → FullEnrich enriches the pick → graph animates. Deterministic, debuggable, fast.
+- **v1:** the input field also accepts a free prompt ("fintechs in Paris hiring SDRs") → Claude + FullEnrich Search (`people/search`, `company/search`) propose companies → user picks → v0 flow.
+- **v2 (only after v0 is solid E2E):** upgrade the orchestrator to a real **agentic tool-use loop** — Claude gets Sillage MCP tools + FullEnrich as tools and decides what to fetch and who to target. This is the "depth of AI use" points.
+- **Autopilot toggle:** signal feed auto-enqueues prospects and shows decks auto-generating.
+
+
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Language(s) | <TypeScript 5.x strict / Python 3.12+ typed> |
-| Framework | <Next.js App Router / FastAPI / ...> |
-| Package manager | <npm / pnpm / uv> — do not switch without approval |
-| Data / state | <Postgres + Prisma / SQLite / in-memory store behind an interface> |
-| LLM / external APIs | <provider + model, links to docs> |
-| Validation | <Zod / Pydantic> — all external input parsed at the boundary |
-| Tests | <Vitest / pytest> |
-| Lint / format / types | <ESLint + Prettier + tsc / Ruff + Pyright> |
+
+| Layer           | Choice                                                                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| App             | Next.js **16.2.10** (App Router) + React 19.2 + TypeScript strict + Tailwind **v4**                                                                                                        |
+| UI components   | shadcn/ui initialized (base-nova preset, **Base UI — not Radix**) — **PROVISIONAL, not locked**: component-layer deep research pending; don't build deep dependencies on its internals yet |
+| Design          | **LOCKED:** light, premium, salesy style; the **Three.js node graph is the visual centerpiece** of the product. Colors only: to define (D011).                                             |
+| Graph           | **Vanilla Three.js** mounted in a React component, behind a **data-only props interface** (`nodes`, `links`, statuses) — renderer stays swappable if 3D melts down                         |
+| LLM             | AI SDK (`ai` + `@ai-sdk/anthropic`), model `claude-sonnet-5`, structured outputs (`Output.object`)                                                                                         |
+| Sillage         | **MCP client OR V2 API** — whichever access lands first at kickoff; adapter interface is the invariant                                                                                     |
+| FullEnrich      | REST **v2** (Bearer)                                                                                                                                                                       |
+| Package manager | **npm** — do not switch                                                                                                                                                                    |
+| State           | In-memory + JSON files in `data/` — no DB                                                                                                                                                  |
+| Email           | Resend (video as **link, never attachment**)                                                                                                                                               |
+| Live notify     | SSE (or simple polling)                                                                                                                                                                    |
+| Video tooling   | ffmpeg + Playwright, local, run from `engine/`                                                                                                                                             |
+
+
+
 
 ## Commands
 
 ```bash
-<install>            # e.g. pnpm install / uv sync
-<dev>                # run the app locally
-<test>               # full test suite
-<test-focused>       # single file / keyword filter
-<typecheck>          # tsc --noEmit / pyright
-<lint>               # check-only
-<build>              # production build
+npm install
+npm run dev                 # app on :3000
+npx tsc --noEmit            # typecheck — must pass before every commit
+npm run lint                # eslint 9 flat config
+npm run build               # production build
+npx tsx engine/<script>.ts  # run a pipeline script standalone
+npx tsx scripts/smoke.ts    # THE demo-path smoke run — re-run after every change
+npx shadcn@latest add <component>   # add shadcn/ui components
 ```
+
+
 
 ## Architecture
 
 ```
-<project structure tree, 2 levels deep, one comment per folder, e.g.:>
-src/
-  app/          # thin routes / entry points — wiring only, no business logic
-  core/         # pure domain logic — no IO, no framework, no model calls
-  services/     # business logic + transaction boundaries, typed inputs/outputs
-  adapters/     # external systems (APIs, DB, storage) behind interfaces
-  components/   # UI, private feature folders behind a public barrel
+[Company name OR sector prompt] → POST /api/prospect
+   ├─ lib/sillage.ts     → getSignals(company), getPeople(company)   (Sillage MCP/API, mock fallback)
+   ├─ lib/orchestrator.ts→ Claude: rank people, pick best contact, write angle (structured output)
+   ├─ lib/fullenrich.ts  → enrichContact(person) → {email, phone, linkedin, title}  (v2 API, mock fallback)
+   └─ data/prospects/{id}.json → graph nodes stream to UI
+
+[Generate] → POST /api/generate/{prospectId}   (long-running, streams progress via SSE)
+   1. lib/research.ts  → Claude: company brief + angle from signals
+   2. lib/gamma.ts     → Gamma Generate API → deck → export PNG per slide → data/slides/{id}/
+   3. lib/script.ts    → Claude: one short VO line per slide (≤ 2 sentences, personalized)
+   4. engine/tts.ts    → Gradium TTS per line (cloned voice) → wav + durations (ffprobe)
+   5. engine/assemble.ts → slides→video: dwell = VO duration +0.4s, Ken-Burns, concat
+   6. engine/avatar.ts → fal.ai talking-head from presenter photo + VO → PIP bottom-right
+   → public/videos/{id}.mp4 (+ poster.jpg)
+
+[Send] → POST /api/send/{prospectId} → Resend: 3-line personal note (Claude) + thumbnail → /v/{id}
+
+[Watch] → /v/{id} public share page → on play + every 10s: POST /api/track (hash IP, no raw PII)
+   → dashboard SSE → 🔔 LOUD cha-ching + toast "{Name} is watching — {mm:ss}"
 ```
 
-Non-negotiable structural rules:
-
-- **Dependencies point inward only.** Entry points call services; services call the domain core and adapters. If you feel the need to put an HTTP concern in a service, business logic in a route, or an external SDK call in the pure core — **stop and rethink the layer** before writing code.
-- **Monolith tripwire:** a module past ~300–400 lines, or a function juggling unrelated concerns, gets split into a focused sibling module — not another method.
-- **Raise domain-specific errors in the core; translate them to HTTP status / CLI exit / UI state exactly once** at the transport boundary. Never scatter status handling through business logic.
-- **Time-box every external call** (LLM, API, DB, storage). One slow dependency must not be able to hang a request. Never hold a transaction, session, or lock open across an external call.
-- **Make impossible states impossible.** Model state machines as discriminated unions plus a legal-transition map, not loose booleans. Stable IDs over list positions.
-- **Parse external input at the boundary.** URL params, env vars, uploaded files, LLM output, webhook payloads — validate into typed domain values before they reach logic.
-- **Don't scaffold.** Create only folders and abstractions with real code behind them. No speculative seams, empty directories, or pre-built flexibility the flow doesn't need yet.
-
-## Take a step back before writing code
-
-Before implementing, answer:
-
-1. **Has this already been built?** Grep first (`rg`). Duplication is the most common agent failure.
-2. **Does this file already encode the answer?** Re-read the relevant section.
-3. **Is this the right layer for the change?**
-4. **Will this create or extend a monolith?** If a module is near the tripwire, split first.
-5. **Is the test value real?** A unit test that mocks everything it touches is noise.
-
-When in doubt, ask — a 20-second clarification beats a 2-hour wrong implementation. Challenge before you build: restate the goal in one line, flag risky or underspecified assumptions, propose the alternative with its tradeoff. Once the user decides, disagree and commit.
-
-## Quality rules
-
-These override personal style and anything the existing code happens to do.
-
-### Typing
-
-- No `any` / `as any`, anywhere — including ORM writes. Fix types properly: narrow, add a type guard, add a generic parameter, or update the interface.
-- No double casts (`value as unknown as T`) and no non-null assertions to silence uncertainty — fix the upstream type or model the empty/loading/error state explicitly.
-- Annotate generic type parameters explicitly when constructing from external data (`new Set<string>(data)`).
-- Python: full type hints on every function, modern syntax (`list[str]`, `X | None`), no `Any`, avoid `cast()` and bare `type: ignore`.
-
-### Code shape
-
-- Guard clauses first; max ~3 levels of nesting. One responsibility per function.
-- Named constants for thresholds, batch sizes, retries — no magic numbers.
-- Descriptive names over abbreviations; prefer a self-explanatory name over a comment.
-- **Comments capture business decisions only** — a product constraint, an external-system requirement, a deliberate deviation from the obvious approach. Never narrate what the code does, and no "added for task X" trailers.
-- **Helper migration discipline:** when introducing a helper, grep for every inline duplicate of the logic it replaces and migrate them all in the same PR. A helper that coexists with the raw pattern it abstracts is worse than no helper.
-- **Remove dead code.** If you migrate all call sites, delete the old function — no deprecated wrappers, shims, or `// removed` comments. Grep to confirm zero callers before committing.
-
-### Security
-
-- Secrets live in env vars / secret manager only. Server-side keys never reach the client (never `NEXT_PUBLIC_*` or equivalent), never get committed, never appear in logs or error messages.
-- Never log secrets, tokens, auth headers, PII, raw user content, or full prompts.
-- Auth fails closed in production. A secret URL is not auth.
-- Validate all external input with schemas; parse and validate LLM output before acting on it. LLM output is a draft until confirmed — **no uncontrolled AI writes** to external systems.
-- Do not weaken auth, scopes, tests, or safety checks to make CI pass.
-
-### Logging
-
-- Structured events with stable `snake_case` names. Emit a start event and a completion event carrying identifiers and `duration_ms`, so a hung step is visible as a start without its matching completion.
-- Aggregate counts instead of logging per-row/per-frame inside loops.
-
-## Testing
-
-Every non-trivial change ships with meaningful tests. A change without them is incomplete. Never weaken or delete a test to make it pass.
-
-**Think before writing a test.** For the unit under change, answer: (1) what is its contract? (2) what are the edge cases — empty, single, duplicate, `None`/zero/negative, unicode, stale state, races? (3) what are the failure modes — timeout, constraint violation, malformed input? (4) what invariant must always hold? (5) what would catch the bug a future refactor introduces? If you cannot answer these, you do not understand the code well enough to change it.
-
-- Coverage is by **value, not percentage**. High-value paths get a happy path + one test per edge case + one per failure mode; thin passthroughs get none.
-- **Mutation-test mindset:** if flipping `>` to `>=` or deleting a guard clause would still pass the suite, the tests are weak.
-- Arrange / Act / Assert with blank lines between phases. Name tests after **behavior**, not the function. One behavior per test — if the name needs an "and", split it.
-- **Mock at the boundary only** (external APIs, LLM calls, time, network) — never the unit under test or internal helpers. Assert observable outcomes (returned values, state, status codes), not internal calls.
-- LLM evals are a separate, explicitly-marked tier (slow, costs credits) — excluded from the default test run.
-- Test-data scripts and throwaway verification code are means-to-verify, **not part of the change** — do not commit them.
-
-### Validation gate — run before any handoff
-
-```bash
-<typecheck>
-<lint>          # check-only; never auto-fix or reformat as part of a commit
-<test>
-<build>
+```
+app/            # routes + API — thin wiring only; long jobs spawn engine scripts via npx tsx
+components/     # UI; components/graph/ = Three.js scene behind data-only props; components/ui/ = shadcn
+lib/            # adapters (sillage, fullenrich, gamma, email) + claude steps (orchestrator, research, script) + utils.ts (shadcn cn)
+engine/         # EDOUARD'S LANE — standalone tsx scripts: tts.ts, assemble.ts, avatar.ts
+data/           # prospects/{id}.json · slides/{id}/*.png  ← the lane contract (gitignored, .gitkeep'd)
+public/videos/  # {id}.mp4 + {id}.jpg  ← engine output (gitignored)
+scripts/        # smoke.ts and other throwaway runners
 ```
 
-If a command cannot be run, say why and state the residual risk. **Do not assume previous results are still valid** — every change can regress something, so re-run after every change, even "trivial" ones.
 
-## Git workflow
 
-- One dedicated branch per feature/fix: `<type>/<slug>` (e.g. `feat/live-translate-channel`). No `wip`, `patch-1`, or tool-generated names. One branch, one concern, one PR — no stacked PRs unless explicitly requested.
-- **Conventional Commits** (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`), scoped when a scope is clear, imperative mood, body when there's meaningful context or tradeoffs. All repo artifacts (comments, commits, PR text) in **English**, regardless of the conversation language.
-- **No `Co-Authored-By` or tool-attribution lines** in commits, PR bodies, or squash descriptions. Commit messages describe the change, not the tooling. Strip accidental trailers before push.
-- **Stop before commit.** Implement, validate, then stop and report: summary, changed files, validation results, residual risks, open questions. Commit and open the PR only after explicit approval.
-- **Never merge a PR yourself.** Merging is a human-only action, no matter how green CI is.
-- **No force pushes, no destructive git operations.** `push --force` (even `--force-with-lease`), `reset --hard`, `clean -f`, `rebase` on pushed branches, deleting branches with unmerged work, or anything that rewrites shared history requires explicit approval first.
-- PR title: `<type>: <summary>`. PR body: exactly `## Context`, `## Implementation`, `## Checks / QA`. The QA section lists only commands actually run and concrete reviewer verification steps with expected outcomes — and states explicitly what was **not** tested.
-- UI-affecting changes: include before/after screenshots in the PR body. No screenshots, no PR.
+### Team lanes & the contract between them
 
-## Agent rules
+- **Lane A — Mathis + Tom:** app, graph UI, adapters, orchestrator, send/share/tracking, Autopilot.
+- **Lane B — Edouard:** everything in `engine/` (rebuilt from scratch — the old Diffender code is not in this repo). Merges to `main` continuously.
+- **File-based contract (do not break it):** engine reads `data/prospects/{id}.json` + `data/slides/{id}/*.png`, writes `public/videos/{id}.mp4` + `public/videos/{id}.jpg`. Each side can build and test against fixture files without the other.
 
-- Read the affected files before editing them. Keep changes small and verifiable.
-- Implement only the requested scope. New dependencies require explicit approval.
-- Ask before consequential product, architecture, security, or workflow assumptions — use direct questions, don't guess.
-- **Do not trust internal knowledge for fast-moving libraries** (LLM SDKs, agent frameworks, new APIs). Read the installed package docs, `node_modules/<pkg>/docs/`, or the official reference before writing integration code.
-- Do not kill or restart the owner's running dev servers or long-lived processes without asking.
-- **No destructive commands without explicit approval:** `rm -rf`, dropping or truncating database tables, deleting cloud resources, overwriting files you did not create, bulk renames/moves. Before deleting or overwriting anything, look at the target — if it doesn't match what you expected, stop and surface it.
-- Protected paths: <list any read-only, source-of-truth directories — e.g. golden datasets, generated clients, vendored docs>. Never modify them without explicit approval; never hand-edit generated files — regenerate them.
-- When adding a hard-won rule to this file, state the one-line **Why** first, then the normative rule. Example: *"Incident: schema drift broke batch inserts because production missed a check constraint. Rule: schema changes must ship with a migration and a health-check path."*
 
-## Decision log
 
-Record durable decisions here, numbered, newest last. Later entries may supersede earlier ones (say so: "Supersedes D00X"). Decisions are challengeable before implementation — settled after.
+## Partner adapters — exact facts (verified 2026-07-09)
 
-- **D001** — <date> — <decision, one line of why, rejected alternative>.
+- **Sillage** (`lib/sillage.ts`): **MCP or V2 API — both are valid; use whichever access lands first at kickoff.** No public docs (verified: docs are participant-gated; MCP docs + V2 API key link handed at kickoff; workspace at hackathon.getsillage.com, ≤20 tracked accounts, login with registered email; API key via app settings). The invariant is the adapter interface: `getSignals(company) → Signal[]`, `getPeople(company) → Person[]` — transport (MCP client via AI SDK `experimental_createMCPClient`, or REST) is an implementation detail behind it. **Write against the mock first.** In v2, if on MCP, hand the tools to Claude directly.
+- **FullEnrich** (`lib/fullenrich.ts`): **v2 API** — docs: [https://docs.fullenrich.com](https://docs.fullenrich.com) (index: `/llms.txt`). `POST https://app.fullenrich.com/api/v2/contact/enrich/bulk`, `Authorization: Bearer`. Async waterfall → poll `GET /api/v2/contact/enrich/bulk` (skip webhooks). Key from [https://app.fullenrich.com/app/api](https://app.fullenrich.com/app/api). Also: `POST /api/v2/people/search` + `/api/v2/company/search` for v1 prospecting. The brief's v1 URL is outdated — use v2.
+- **Gamma** (`lib/gamma.ts`): `POST https://public-api.gamma.app/v1.0/generations` — header `X-API-KEY` (NOT Bearer). Body: `{ inputText, textMode, format: "presentation", numCards: 6-8, exportAs: "png" }`. Poll `GET /v1.0/generations/{id}` until done → `gammaUrl` + `exportUrl` (signed, ~1 week). **Surface** `gammaUrl` **in the UI** ("open in Gamma") — visible Gamma love for the prize. Docs: [https://developers.gamma.app](https://developers.gamma.app)
+- **Gradium** (`engine/tts.ts`): `POST https://api.gradium.ai/api/post/speech/tts`, header `x-api-key`, body `{ text, voice_id, output_format: "wav", only_audio: true, model_name: "default" }`. Voice id from `GRADIUM_VOICE_ID` (cloned voice).
+- **fal.ai** (`engine/avatar.ts`): `@fal-ai/client`, `fal.subscribe(MODEL, { input, logs })` with a talking-head model; ~66s audio works in one call.
+- **Anthropic**: AI SDK + `@ai-sdk/anthropic` only. **Never route image content through OpenRouter — broken serialization. Anthropic-native only.**
+- **Resend** (`lib/email.ts`): sender domain via env; onboarding sender as fallback. Video always a **link** to `/v/{id}` — deliverability.
 
-## External services
 
-| Service | Purpose | Env vars |
-|---|---|---|
-| <LLM provider> | <what it's used for> | `<API_KEY_NAME>` |
-| <storage / DB> | <...> | `<...>` |
 
-Keep a committed `.env.example` in sync with every variable the app reads. Never commit `.env.local` or real keys.
+## Mocks-first policy (non-negotiable)
 
----
+Every adapter (`sillage.ts`, `fullenrich.ts`, `gamma.ts`) ships a **realistic deterministic mock** behind the same interface, switched by env (key/URL absent → mock). Mock data must look REAL ("VP Sales left for {Company} 12 days ago", "3 SDR job openings posted"). The demo can never die on stage because a partner API is down. When real access lands, flip envs one by one and verify.
 
-## Hackathon mode
+**Gamma fallback** (if API access is delayed): Claude writes slide JSON → HTML slides → Playwright screenshots. Same PNG output, pipeline unchanged. (Still push hard for real Gamma — $1000 prize.)
 
-<!-- Keep this section for hackathons/demos; delete it for long-lived projects. -->
+## Quality rules — hackathon mode
 
-Time-boxed build (~<X> hours). The demo path **is** the product. Rules above still apply unless explicitly relaxed here.
+**Never relaxes:**
 
-**What changes:**
+- `npx tsc --noEmit` passes before every commit. No `any` / `as any` — type errors cost more than they save under pressure.
+- **Parse every LLM and external response with Zod at the boundary** before acting on it. A demo that crashes on a malformed response is a failed demo.
+- Secrets only in `.env.local` (never committed, never `NEXT_PUBLIC_*`, never logged). Keep `.env.example` in sync.
+- Time-box every external call; on timeout/failure, fall back to the mock — never hang the UI.
+- Grep before building (`rg`) — has this already been built? SDK quickstarts exist; use them.
+- Track hashed IPs only on `/api/track` — no raw PII in logs.
 
-- **Build the riskiest integration first.** Prove the load-bearing capability (the one the demo cannot work without) end-to-end within the first hours, ugly. Everything else layers on top of a working spine.
-- **Vertical slice over horizontal completeness.** One scenario, demoed flawlessly, beats five half-working features. Cut scope, not the demo path.
-- Stop-before-commit relaxes to: commit early and often to `main` or short-lived branches; keep every commit runnable so you can roll back live.
-- Testing focuses on the demo path: one smoke test / script that exercises the full flow beats a unit-test suite. Re-run it after every change — a broken demo found at minute 5 is fixable; at minute 55 it is not.
-- A hardcoded fallback for every external dependency in the demo (canned API response, recorded audio, seeded state) — networks fail on stage.
+**Relaxed today:**
 
-**What never relaxes:**
+- Commit **early and often to** `main`; every commit runnable so we can roll back live. No PR ceremony, no branch policing.
+- No unit-test suite. **One smoke script (**`scripts/smoke.ts`**) exercising the demo path** — re-run after every change, and every new demo step adds its check there. A broken demo found at minute 5 is fixable; at minute 55 it is not.
+- Comments/polish/refactors only on the demo path. Cut scope, not the demo path.
 
-- No secrets in client code or committed files.
-- Typecheck must pass — type errors cost more time than they save under pressure.
-- Parse LLM/external output before acting on it — a demo that crashes on a malformed response is a failed demo.
-- The step-back checklist — especially "has this already been built?" (SDK quickstarts and official examples exist; use them).
-- Update this file when the plan changes, so every teammate's agent stays aligned.
+**Tooling gotchas (hard-won — violating these costs an hour each):**
 
-**Demo checklist (fill in during the event):**
+- Next.js 16 differs from training data — **read** `node_modules/next/dist/docs/` **before writing framework code**.
+- shadcn CLI changed: `npx shadcn@latest init -y -d` (base-nova preset), `npx shadcn@latest add <component>` — old flags like `--base-color` are gone.
+- ffmpeg concat **FILTER**, never the demuxer (inputs differ); normalize each input with `setsar=1` + `yuv420p`.
+- Ken-Burns `zoompan`: **pre-composite the still to ONE frame first**, or it renders d× frames per input.
+- **Never** `-shortest` when muxing VO — it truncates the outro.
+- `tsx -e` breaks on top-level await → use script files.
+- Next.js only auto-loads `.env.local` → engine scripts load their own env; run Playwright/ffmpeg from the engine dir.
+- `create-next-app` writes its own `AGENTS.md` — it clobbered this file once already (restored). Careful when hoisting scaffolds.
 
-- [ ] Load-bearing capability proven end-to-end
-- [ ] Second capability fires *because* the first is running (not bolted on)
-- [ ] Full demo run-through from a clean state, twice
-- [ ] Fallbacks tested (kill the network, replay the canned path)
-- [ ] Pitch states the one thing the task can't work without
+
+
+## Timing strategy
+
+- **Live on stage:** input → graph → Send → cha-ching (seconds, safe). Full chain: never live.
+- **~15:00:** find jury/sponsor company names → pre-generate their decks + videos.
+- **Deploy: Vercel (locked, D014).** The app (share page `/v/{id}` + tracking API) deploys to Vercel early. Constraint: **video generation stays LOCAL** — ffmpeg/Playwright/engine scripts don't run on Vercel — so pre-baked videos must reach the deployed app (commit + deploy, or Vercel Blob) before the demo. **Test email links from a phone on 4G by 15:00.**
+- Record a **full-run screen capture**: fallback video + material for the X/LinkedIn posts (tag @Anthropic @Sillage @FullEnrich, `#agenticgtm` — two more prizes).
+
+
+
+## Env vars (`.env.local` — never commit)
+
+See `.env.example` (committed, kept in sync — it is the authoritative list):
+`ANTHROPIC_API_KEY` · `SILLAGE_MCP_URL` / `SILLAGE_API_KEY` (either enables the real adapter) · `FULLENRICH_API_KEY` · `GAMMA_API_KEY` · `GRADIUM_API_KEY` + `GRADIUM_VOICE_ID` · `FAL_KEY` · `RESEND_API_KEY` + `EMAIL_FROM` · `APP_URL`
+
+## Build order (2 lanes, steps in strict order — riskiest integration first)
+
+
+| Step | Lane A — Mathis + Tom (app)                                                 | Lane B — Edouard (engine/)                                                |
+| ---- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1    | ~~Scaffold app + theme~~ ✅ + Three.js graph w/ mocks                        | Gradium TTS client + chaching.mp3 + assemble.ts skeleton (fixture slides) |
+| 2    | Real Sillage + FullEnrich v2 adapters + orchestrator (Claude pick) + drawer | Gamma adapter → PNG slides → assembled video E2E                          |
+| 3    | Send (Resend) + share page + tracking + SSE cha-ching                       | Avatar PIP integrated; first full video                                   |
+| 4    | Autopilot toggle + v1 prompt input + Vercel deploy + phone test             | Pre-generate jury-company videos                                          |
+| 5    | **Submission**, fallback recording, pitch rehearsal, viral posts            | Buffer                                                                    |
+
+
+(Deadlines live in "The event" and "Timing strategy" — steps here carry no clock.)
+
+## Definition of done
+
+- [ ] Type a company → real Sillage signals + Claude-picked contact + real FullEnrich enrichment on the 3D graph
+- [ ] One click → Gamma deck (PNG slides) → cloned-voice narrated video with avatar PIP
+- [ ] Send → email arrives on a phone → tap → share page plays
+- [ ] Dashboard cha-chings LOUDLY + live watch-time within 2s of play
+- [ ] Autopilot toggle shows the agentic loop
+- [ ] v1: prompt input proposes companies · v2: orchestrator upgraded to agentic tool-use loop
+- [ ] Fallback video recorded; posts drafted with sponsor tags
+
+
+
+## Open vs locked — quick glance
+
+**Deliberately open (decide later, never hardcode in the meantime):**
+
+- Colors / palette (D011) — define during theme work
+- UI component layer (D010) — shadcn provisional, keep usage shallow
+- Graph layout algorithm (radial vs force-directed vs hybrid) — Lane A prototypes, then logs the pick
+- Avatar model + narration voice — **Edouard's call** (D013)
+- Email sender address / domain — must be decided **before the 15:00 phone deliverability test** (D013)
+- Demo assets: presenter photo, chaching.mp3 — open (D013)
+
+**Confirmed working rules (D014):**
+
+- Graph animates **progressively** — nodes land as each adapter returns; slow enrichment never blocks the moment.
+- Target/jury companies are added to the Sillage workspace **at kickoff** (≤20 accounts) so signals have time to populate.
+- App deploys on **Vercel**; video generation stays local (see Timing strategy).
+
+## Decision log (append-only, newest last)
+
+- **D001** — 2026-07-09 — Graph is vanilla Three.js in a React component behind a data-only interface. Rejected: react-flow (brief §3) — team wants the 3D wow; the interface keeps a 2D fallback cheap.
+- **D002** — 2026-07-09 — Orchestrator staged: v0 hybrid (deterministic adapters + one Claude structured pick) → v2 agentic tool-use loop after v0 works. Rejected: agent-loop-first (too slow to debug on demo day).
+- **D003** — 2026-07-09 — Sillage via MCP client (no public REST API exists); FullEnrich via REST v2 with polling. Supersedes brief §5's Sillage-API + FullEnrich-v1 assumptions.
+- **D004** — 2026-07-09 — Input staging: v0 company name (judged path), v1 sector/prompt → proposed companies as second milestone.
+- **D005** — 2026-07-09 — Full video scope: Gamma + Gradium voice + fal.ai avatar PIP. Rejected: voice-only (loses wow + weakens Gradium prize story).
+- **D006** — 2026-07-09 — Video pipeline rebuilt from scratch in `engine/` (Diffender reuse code unavailable in this repo); its gotchas kept as rules above.
+- **D007** — 2026-07-09 — npm; in-memory + JSON state; no DB, no test suite — one smoke script for the demo path.
+- **D008** — 2026-07-09 — Scaffold live at repo root: create-next-app (Next 16.2.10, React 19.2.4, Tailwind v4, ESLint 9, `--app --no-src-dir`, alias `@/`*) + shadcn/ui init (`-d`, base-nova) + deps `three ai @ai-sdk/anthropic zod resend @fal-ai/client` (+ dev: `@types/three tsx`). Lane folders + `.gitkeep`s created; `data/*` and `public/videos/*` gitignored; `.env.example` committed; `scripts/smoke.ts` seeded. Typecheck + build + smoke all pass.
+- **D009** — 2026-07-09 — Sillage transport: **MCP or V2 API, both valid** — use whichever access lands first at kickoff; the `getSignals`/`getPeople` adapter interface is the invariant, transport hidden behind it. Env: `SILLAGE_MCP_URL` or `SILLAGE_API_KEY` enables the real adapter (absent → mock). Docs are participant-gated (nothing public — verified 2026-07-09). Partially supersedes D003 (which locked MCP-only).
+- **D010** — 2026-07-09 — UI component layer **NOT locked**: shadcn/ui is initialized (base-nova preset, Base UI under the hood — not Radix) and usable, but the choice is provisional pending a component-layer deep research. Until then: add components only via `npx shadcn@latest add`, keep usage shallow (no reliance on internals), so swapping stays cheap. `shadcn` CLI moved to devDependencies.
+- **D011** — 2026-07-09 — Colors **unlocked, to define** during theme work. Supersedes the brief §3 mandate — that reasoning was Diffender-specific. The "ONE accent color" principle stays.
+- **D012** — 2026-07-09 — Design **locked as design, not colors**: light/premium/salesy style + the Three.js node graph as the visual centerpiece (with D001). Only the palette stays open (D011).
+- **D013** — 2026-07-09 — Delegated/open by team choice: fal.ai avatar model + narration voice are **Edouard's call** (Lane B); email sender domain and demo assets (presenter photo, chaching.mp3) stay **open** — sender must be settled before the phone deliverability test. Graph layout algorithm also open (Lane A prototypes first). `AUTODECK-BRIEF.md` got a superseded-banner so no agent follows its outdated instructions.
+- **D014** — 2026-07-09 — **Vercel deploy locked** for the app (share page + tracking); video generation stays local (ffmpeg/Playwright can't run there) — pre-baked videos reach production via commit+deploy or Vercel Blob. Confirmed working rules: progressive graph animation (nodes land per adapter); Sillage workspace gets the target/jury companies at kickoff. Supersedes the tunnel-vs-Vercel day-of decision.
+

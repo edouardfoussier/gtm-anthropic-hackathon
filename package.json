@@ -1,22 +1,46 @@
 {
   "name": "autodeck",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "typecheck:engine": "tsc -p engine/tsconfig.json",
     "generate": "tsx engine/src/cli.ts",
-    "typecheck": "tsc --noEmit"
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.8",
+    "@ai-sdk/anthropic": "^4.0.10",
+    "@base-ui/react": "^1.6.0",
     "@fal-ai/client": "^1.10.1",
-    "@napi-rs/canvas": "^0.1.60",
-    "ai": "^7.0.15",
-    "zod": "^3.22.0"
+    "@napi-rs/canvas": "^0.1.100",
+    "ai": "^7.0.18",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.23.0",
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "resend": "^6.17.2",
+    "tailwind-merge": "^3.6.0",
+    "three": "^0.185.1",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.185.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "shadcn": "^4.13.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.0",
+    "typescript": "^5"
   }
 }
