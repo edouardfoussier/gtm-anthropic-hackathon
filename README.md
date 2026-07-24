@@ -4,7 +4,7 @@
 
 An intent signal (**Sillage**) → the right person, picked and pitched (**Claude** + **FullEnrich**) → a narrated video deck (**Gamma** + **Gradium** cloned voice + avatar) → in the prospect's inbox (**Resend**) → a live *"your prospect is watching"* cha-ching.
 
-Built in one day at the **Agentic GTM Hackathon** (Station F, Paris — 2026-07-09).
+Built in one day at the **Agentic GTM Hackathon** (Station F, Paris — 2026-07-09), with [Mathis Villaret](https://github.com/Mathis-14).
 
 ![AutoDeck landing — type a company, watch the pipeline build itself](assets/landing.png)
 
